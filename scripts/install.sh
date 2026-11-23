@@ -16,5 +16,7 @@ mkdir -p "$dest"
 # Replace our files, keep what Herdr writes there (jsconfig.json, *.d.ts).
 find "$dest" -mindepth 1 -maxdepth 1 ! -name jsconfig.json ! -name '*.d.ts' -exec rm -rf {} +
 (cd "$root/mod" && tar cf - --exclude jsconfig.json --exclude '*.d.ts' --exclude .DS_Store .) | (cd "$dest" && tar xf -)
+# Asset paths (mods/<name>/icons) follow the installed folder name.
+printf 'export const MOD = "%s";\n' "$name" > "$dest/src/name.js"
 if [ "${1:-}" = prototype ]; then cp "$root/mock/mock.js" "$dest/src/mock.js"; fi
 echo "$dest"

@@ -12,3 +12,6 @@
 - Status options: Backlog, Specified, Designed, Tests Written, In Progress, In Review, Done
 - Priority options: P0, P1, P2, P3
 - Size options: XS, S, M, L, XL
+
+## Delivery
+- Feature flags: no

@@ -30,3 +30,11 @@ test("should install the prototype copy with the mock layer", () => {
   assert.equal(dest, join(home, "mods/project-board-prototype"));
   assert.match(readFileSync(join(dest, "src/mock.js"), "utf8"), /export function mock/);
 });
+
+test("should point icon paths at the installed folder name", () => {
+  const home = mkdtempSync(join(tmpdir(), "herdr-"));
+  for (const [args, name] of [[[], "project-board"], [["preview"], "project-board-preview"]]) {
+    const dest = install(home, ...args);
+    assert.equal(readFileSync(join(dest, "src/name.js"), "utf8"), `export const MOD = "${name}";\n`);
+  }
+});

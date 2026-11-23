@@ -1,0 +1,8 @@
+.DS_Store
+.worktrees/
+.claude/worktrees/
+.nsprc
+node_modules/
+# written by Herdr into a mod folder
+mod/jsconfig.json
+mod/*.d.ts

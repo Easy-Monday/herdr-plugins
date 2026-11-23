@@ -67,7 +67,7 @@ export function Notice({ id, icon, title, detail, list }) {
       el.child(
         v_flex()
           .gap(4)
-          .children(list.map((name) => div().text_size(TEXT.small).text_color(t.foreground).whitespace_normal().text_center().child(name))),
+          .children(list.map((name) => div().text_size(TEXT.small).text_color(t.foreground).child(name))),
       ),
     );
 }

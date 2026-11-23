@@ -1,8 +1,7 @@
 // Reading the board through gh: GraphQL queries only, never mutations (BRD §5.1).
 import { gh } from "./gh.js";
 
-// shortcut: the first 20 linked boards only; more than one already means "only one is supported".
-const PROJECTS = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){projectsV2(first:20){nodes{id number title closed}}}}`;
+const PROJECTS = `query($owner:String!,$name:String!,$after:String){repository(owner:$owner,name:$name){projectsV2(first:100,after:$after){nodes{id number title closed}pageInfo{hasNextPage endCursor}}}}`;
 
 async function graphql(query, vars) {
   const args = ["api", "graphql", "-f", `query=${query}`];
@@ -14,7 +13,16 @@ async function graphql(query, vars) {
   return json;
 }
 
-export function loadProjects(repo) {
+// Every linked board, page by page: closed boards fill pages too, so one page can miss the open one.
+export async function loadProjects(repo) {
   const [owner, name] = repo.split("/");
-  return graphql(PROJECTS, { owner, name });
+  const nodes = [];
+  let after;
+  for (;;) {
+    const page = (await graphql(PROJECTS, after ? { owner, name, after } : { owner, name })).data?.repository?.projectsV2;
+    nodes.push(...(page?.nodes ?? []));
+    if (!page?.pageInfo?.hasNextPage) break;
+    after = page.pageInfo.endCursor;
+  }
+  return { data: { repository: { projectsV2: { nodes } } } };
 }

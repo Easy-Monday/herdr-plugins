@@ -74,7 +74,14 @@ export default class ProjectBoard extends View {
         // exec rejects when git can't start: not installed, folder gone, machine unreachable.
         screen = { kind: "git-error", message: e.message };
       }
-      if (screen.kind === "repo") screen = await findBoard(screen.repo);
+      if (screen.kind === "repo") {
+        // Show the new repo while gh reads its boards, not the previous repo's board name.
+        if (token === this.token && this.screen.repo !== screen.repo) {
+          this.screen = { kind: "loading", repo: screen.repo, folder: sp.folder };
+          cx.notify();
+        }
+        screen = await findBoard(screen.repo);
+      }
       if (token !== this.token) return;
       this.screen = { ...screen, folder: sp?.folder ?? null };
       cx.notify();

@@ -1,5 +1,7 @@
-// The look: Herdr's own panel conventions as small components. Sizes and shapes follow
-// Branch PR's views/ui.js (munza/herdr-mods, Apache-2.0). UI only: values in, callbacks out.
+// The look: Herdr's own panel conventions as small components. UI only: values in, callbacks out.
+// Adapted from Branch PR (munza/herdr-mods, Apache-2.0): TEXT, Icon and Panel from
+// views/ui.js. Changed: TEXT keeps three of its sizes, Icon takes the folder from the
+// installed mod name, and Panel takes the id directly and has no rounded border.
 import { div, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { theme } from "herdr";

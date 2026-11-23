@@ -86,4 +86,4 @@ Requirements are in [docs/brd.md](docs/brd.md); work is tracked on the GitHub pr
 
 ## License
 
-[Apache License 2.0](LICENSE). Repository-detection code is adapted from [Branch PR](https://github.com/munza/herdr-mods/tree/main/branch-pr) (Apache-2.0); see [NOTICE](NOTICE).
+[Apache License 2.0](LICENSE). Repository-detection and UI code is adapted from [Branch PR](https://github.com/munza/herdr-mods/tree/main/branch-pr) (Apache-2.0); see [NOTICE](NOTICE).

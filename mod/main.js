@@ -3,7 +3,6 @@ import { View, div } from "gpui-kit";
 import { v_flex, h_flex, ScrollHandle } from "gpui-base";
 import { theme, spaces, panes, checking, props } from "herdr";
 import { mock } from "./src/mock.js";
-import { MOD } from "./src/name.js";
 import { detectRepo } from "./src/git.js";
 import { loadProjects, loadItems } from "./src/load.js";
 import { pickProject, parseItems, buildTree, visibleRows, progress } from "./src/board.js";
@@ -41,13 +40,6 @@ const store = (key, value) => {
     localStorage.setItem(key, value);
   } catch {}
 };
-const parse = (json) => {
-  try {
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-};
 
 // The active tab's focused terminal folder; a tab without one keeps the space's last
 // (Branch PR's activeSpace(), munza/herdr-mods, Apache-2.0).
@@ -59,21 +51,6 @@ function activeSpace(lastFolder) {
   const current = candidates.find((p) => p.focused) ?? candidates[0];
   if (current) lastFolder.set(sp.id, current.cwd);
   return { id: sp.id, machine: sp.machine ?? null, folder: lastFolder.get(sp.id) ?? sp.folder };
-}
-
-// A copy that opens as the only pane(s) of the active tab is a board tab (#30): it stays on the
-// folder of the terminal it was opened from. Null for a block or a split pane.
-// shortcut: Herdr tells a copy neither its own pane nor the tab it was opened from. This reads the
-// active tab at open time, and takes the tab just before it as the opener (tab.new puts a shown
-// tab right after the shown one), else the space folder. Upgrade when Herdr exposes them.
-function boardTab() {
-  const sp = spaces().find((s) => s.active);
-  const at = sp?.tabs?.findIndex((t) => t.active) ?? -1;
-  const own = panes().filter((p) => p.tab === sp?.tabs[at]?.id);
-  if (!own.length || own.some((p) => p.mod !== MOD)) return null;
-  const opener = panes().filter((p) => p.tab === sp.tabs[at - 1]?.id && p.cwd);
-  const from = opener.find((p) => p.focused) ?? opener[0];
-  return { id: sp.id, machine: sp.machine ?? null, folder: from?.cwd ?? sp.folder };
 }
 
 // [icon, colour, label] for an item's kind and state, as GitHub draws them.
@@ -110,9 +87,6 @@ export default class ProjectBoard extends View {
     this.token = 0;
     this.prototypeOpen = false;
     if (checking()) return;
-    // Kept in this copy's localStorage, so a hot reload while another tab is active keeps it.
-    this.pinned = parse(stored("board-folder")) ?? boardTab();
-    if (this.pinned) store("board-folder", JSON.stringify(this.pinned));
     this.followFocus(cx);
     cx.timer.every(CONTEXT_POLL_MS, (cx) => this.followFocus(cx));
     cx.timer.every(REFRESH_MS, (cx) => {
@@ -120,10 +94,9 @@ export default class ProjectBoard extends View {
     });
   }
 
-  // Switching tab, space or pane, or `cd` in the terminal, shows that folder's board;
-  // a board tab keeps the folder it opened on.
+  // Switching tab, space or pane, or `cd` in the terminal, shows that folder's board.
   followFocus(cx) {
-    const sp = this.pinned ?? activeSpace(this.lastFolder);
+    const sp = activeSpace(this.lastFolder);
     const key = sp ? `${sp.machine ?? "local"}:${sp.folder}` : "";
     if (key === this.key) return;
     this.key = key;

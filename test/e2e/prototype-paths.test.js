@@ -16,7 +16,6 @@ const script = new URL("../../scripts/install.sh", import.meta.url).pathname;
 const home = mkdtempSync(join(tmpdir(), "herdr-proto-"));
 const dest = execFileSync(script, ["prototype"], { env: { ...process.env, HERDR_APP_HOME: home } }).toString().trim();
 const main = pathToFileURL(join(dest, "main.js")).href;
-const MOD = "project-board-prototype";
 
 // Each Herdr copy has its own localStorage; one map stands in for the copy under test.
 const storage = new Map();
@@ -55,7 +54,6 @@ function windowWith(tabs, active, { machine = null, folder = "/work/herdr" } = {
   );
 }
 const terminal = (id, cwd) => ({ id, panes: [{ cwd }] });
-const boardTab = (id) => ({ id, panes: [{ mod: MOD }] });
 
 // Opens the panel, then picks the Board state; `tabs`/`active` describe the window at open time.
 async function open(tabs = [terminal("t1", "/work/herdr")], active = tabs[0].id, opts) {
@@ -401,39 +399,4 @@ test("#8 AC-4: a tab switch and back keeps scroll and expanded rows on the same 
   await switchTo(app, tabs, "t1"); // back
   assert.equal(scrollHandle(app), handle);
   assert.ok(rows(app).includes("I_2"));
-});
-
-// #30 Keep a board tab on the board it started with
-
-// tab.new puts the board tab right after the tab it was opened from, so that tab's terminal counts.
-test("#30 AC-1: a board tab opens on the repo of the terminal focused when it opened", async () => {
-  const tabs = [terminal("t0", "/work/herdr"), terminal("t1", "/work/website"), boardTab("board")]; // space folder: /work/herdr
-  const app = await open(tabs, "board");
-  assert.match(app.text(), /Website relaunch/);
-  assert.match(app.text(), /acme\/website/);
-});
-
-// Herdr-only: the real scroll offset. Here: the same board, handle and expanded rows.
-test("#30 AC-2: a board tab stays on its first board after other tabs, and after a reload", async () => {
-  const tabs = [terminal("t1", "/work/website"), boardTab("board"), terminal("t3", "/work/herdr")];
-  const app = await open(tabs, "board");
-  await press(app, "chevron-I_101");
-  const handle = scrollHandle(app);
-  await switchTo(app, tabs, "t3"); // a tab in another repo
-  assert.equal(app.view.screen.repo, "acme/website");
-  await switchTo(app, tabs, "board"); // and back
-  assert.equal(app.view.screen.repo, "acme/website");
-  assert.equal(scrollHandle(app), handle);
-  assert.ok(rows(app).includes("I_102"));
-  windowWith(tabs, "t3"); // a hot reload while another tab is active
-  const reloaded = await start();
-  assert.equal(reloaded.view.screen.repo, "acme/website");
-});
-
-test("#30 AC-3: a panel outside the tabs still follows the active tab", async () => {
-  const tabs = [terminal("t1", "/work/website"), terminal("t3", "/work/herdr")];
-  const app = await open(tabs, "t1");
-  assert.equal(app.view.pinned, null);
-  await switchTo(app, tabs, "t3");
-  assert.equal(app.view.screen.repo, "Easy-Monday/herdr-plugins");
 });

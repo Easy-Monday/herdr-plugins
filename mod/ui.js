@@ -87,6 +87,20 @@ export function Progress(percent) {
     .child(div().text_size(TEXT.caption).text_color(t.dim).child(`${percent}%`));
 }
 
+// A row's expand control; an empty slot of the same width on rows without sub-issues, so titles line up.
+export function Chevron({ id, open, onClick }) {
+  const t = theme();
+  const slot = div().id(id).w(18).h(18).flex_none().flex().items_center().justify_center().rounded(4);
+  if (!onClick) return slot;
+  return slot
+    .text_color(t.dim)
+    .cursor_pointer()
+    .accessibility_label(open ? "Collapse sub-issues" : "Expand sub-issues")
+    .hover((s) => s.bg(t.hover).text_color(t.foreground))
+    .on_click((_e, cx) => onClick(cx))
+    .child(Icon(open ? "chevron-down" : "chevron-right", 12));
+}
+
 export const IssueNumber = (n) =>
   div().flex_none().text_size(TEXT.caption).text_color(theme().dim).font_family(codeFont()).child(`#${n}`);
 

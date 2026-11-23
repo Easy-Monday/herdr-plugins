@@ -5,8 +5,8 @@ import { theme, spaces, panes, checking } from "herdr";
 import { activeSpace } from "./src/repo.js";
 import { detectRepo } from "./src/git.js";
 import { loadProjects, loadItems } from "./src/load.js";
-import { pickProject, parseItems, progress } from "./src/board.js";
-import { Panel, Header, Notice, Icon, IssueNumber, StatusPill, Progress } from "./ui.js";
+import { pickProject, parseItems, buildTree, progress } from "./src/board.js";
+import { Panel, Header, Notice, Icon, IssueNumber, StatusPill, Progress, Chevron } from "./ui.js";
 
 const CONTEXT_POLL_MS = 1000;
 
@@ -52,38 +52,57 @@ function stateIcon(row, t) {
   return ["issue-open", t.ansi2, "Open"];
 }
 
-// Two lines: state icon, title and #number, then the Status pill and sub-issue progress.
-function Row(row) {
+// Top level: chevron, state icon, title and #number, then the Status pill and sub-issue progress.
+// Sub-issues: one line, indented per level, Status last.
+function Row({ node, depth }, open, onToggle) {
   const t = theme();
-  const [icon, color, label] = stateIcon(row, t);
-  const percent = progress(row.summary);
+  const [icon, color, label] = stateIcon(node, t);
+  const titleLine = h_flex()
+    .gap(6)
+    .items_center()
+    .child(Chevron({ id: `chevron-${node.key}`, open, onClick: node.children.length ? onToggle : null }))
+    .child(Icon(icon, 15).text_color(color).accessibility_label(label))
+    .child(div().flex_1().min_w(0).truncate().child(node.title))
+    .when(node.number != null, (el) => el.child(IssueNumber(node.number)));
+  if (depth)
+    return h_flex()
+      .id(`row-${node.key}`)
+      .flex_none()
+      .h(28)
+      .pl(depth * 20)
+      .pr(4)
+      .gap(6)
+      .items_center()
+      .child(titleLine.flex_1().min_w(0))
+      .when(Boolean(node.status), (el) => el.child(StatusPill(node.status)));
+  const percent = progress(node.summary);
   return v_flex()
-    .id(`row-${row.key}`)
+    .id(`row-${node.key}`)
     .flex_none()
     .px(4)
     .py(5)
     .gap(3)
-    .child(
-      h_flex()
-        .gap(6)
-        .items_center()
-        .child(Icon(icon, 15).text_color(color).accessibility_label(label))
-        .child(div().flex_1().min_w(0).truncate().child(row.title))
-        .when(row.number != null, (el) => el.child(IssueNumber(row.number))),
-    )
-    .when(Boolean(row.status) || percent !== null, (el) =>
+    .child(titleLine)
+    .when(Boolean(node.status) || percent !== null, (el) =>
       el.child(
         h_flex()
-          .pl(21)
+          .pl(45)
           .min_w(0)
           .overflow_hidden()
           .gap(10)
           .items_center()
-          .when(Boolean(row.status), (line) => line.child(StatusPill(row.status)))
+          .when(Boolean(node.status), (line) => line.child(StatusPill(node.status)))
           .when(percent !== null, (line) => line.child(Progress(percent))),
       ),
     );
 }
+
+// The rows on screen: every top-level item, and the children of expanded rows, depth first.
+const shown = (nodes, expanded, depth = 0) =>
+  nodes.flatMap((node) => [
+    { node, depth },
+    ...(expanded.has(node.key) ? shown(node.children, expanded, depth + 1) : []),
+  ]);
 
 // The linked boards of a repo, and the one board's items, as a screen state.
 async function findBoard(repo) {
@@ -91,7 +110,7 @@ async function findBoard(repo) {
     const pick = pickProject(await loadProjects(repo));
     if (pick.kind === "none") return { kind: "no-board", repo };
     if (pick.kind === "many") return { kind: "many-boards", repo, names: pick.names };
-    return { kind: "board", repo, title: pick.project.title, rows: parseItems(await loadItems(pick.project.id)) };
+    return { kind: "board", repo, title: pick.project.title, tree: buildTree(parseItems(await loadItems(pick.project.id))) };
   } catch (e) {
     return { kind: "gh-error", repo, message: e.message };
   }
@@ -100,6 +119,8 @@ async function findBoard(repo) {
 export default class ProjectBoard extends View {
   init(_props, cx) {
     this.lastFolder = new Map();
+    // Keys of the expanded rows. shortcut: one set for every board; story #8 keeps it per board.
+    this.expanded = new Set();
     this.screen = { kind: "loading" };
     this.token = 0;
     if (checking()) return;
@@ -136,6 +157,11 @@ export default class ProjectBoard extends View {
     });
   }
 
+  toggle(key, cx) {
+    if (!this.expanded.delete(key)) this.expanded.add(key);
+    cx.notify();
+  }
+
   render() {
     const s = this.screen;
     const notice = NOTICES[s.kind]?.(s);
@@ -143,7 +169,20 @@ export default class ProjectBoard extends View {
       .child(Header({ title: s.kind === "board" ? s.title : "Project Board", subtitle: s.repo ?? s.folder }))
       .when(Boolean(notice), (el) => el.child(Notice({ id: s.kind, ...notice })))
       .when(s.kind === "board", (el) =>
-        el.child(v_flex().id("board-list").flex_1().min_h(0).overflow_y_scrollbar().px(6).py(4).children(s.rows.map(Row))),
+        el.child(
+          v_flex()
+            .id("board-list")
+            .flex_1()
+            .min_h(0)
+            .overflow_y_scrollbar()
+            .px(6)
+            .py(4)
+            .children(
+              shown(s.tree, this.expanded).map((row) =>
+                Row(row, this.expanded.has(row.node.key), (cx) => this.toggle(row.node.key, cx)),
+              ),
+            ),
+        ),
       );
   }
 }

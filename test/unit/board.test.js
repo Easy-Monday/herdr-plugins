@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildTree, visibleRows, progress, pickProject } from "../../mod/src/board.js";
 import { parseRemoteUrl } from "../../mod/src/repo.js";
+import { classifyError } from "../../mod/src/errors.js";
 
 const issue = (key, status, subIssues = []) => ({ key, type: "Issue", title: key, status: status && { name: status }, subIssues });
 
@@ -32,6 +33,15 @@ test("rounds progress and picks the one open board", () => {
   assert.equal(pickProject(response([{ title: "a", closed: true }])).kind, "none");
   assert.equal(pickProject(response([{ title: "a" }, { title: "b", closed: true }])).project.title, "a");
   assert.deepEqual(pickProject(response([{ title: "a" }, { title: "b" }])).names, ["a", "b"]);
+});
+
+test("tells gh logged out from gh missing the project scope", () => {
+  assert.equal(classifyError(new Error("To get started with GitHub CLI, please run:  gh auth login")), "gh-logged-out");
+  assert.equal(
+    classifyError(new Error("your authentication token is missing required scopes [read:project]\nTo request it, run:  gh auth refresh -s read:project")),
+    "gh-scope",
+  );
+  assert.equal(classifyError(new Error("HTTP 502: Bad Gateway")), "api-error");
 });
 
 test("reads owner/repo from GitHub remotes only", () => {

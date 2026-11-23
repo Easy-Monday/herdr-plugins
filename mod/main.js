@@ -226,12 +226,21 @@ export default class ProjectBoard extends View {
             this.tryAgain(),
           ],
         });
-      case "gh-auth":
+      case "gh-logged-out":
         return Notice({
-          id: "gh-auth",
+          id: "gh-logged-out",
+          icon: "terminal",
+          title: "gh isn't logged in",
+          detail: "The panel reads the board through gh. Log in with the project scope in a terminal, then try again.",
+          command: "gh auth login -s project",
+          buttons: [this.tryAgain()],
+        });
+      case "gh-scope":
+        return Notice({
+          id: "gh-scope",
           icon: "terminal",
           title: "gh can't read project boards",
-          detail: "gh isn't logged in, or its login lacks the project scope. Run this in a terminal, then try again.",
+          detail: "gh is logged in, but its login lacks the project scope. Add it in a terminal, then try again.",
           command: "gh auth refresh -s project",
           buttons: [this.tryAgain()],
         });

@@ -7,11 +7,14 @@ export const timers = [];
 const timer = { every: (ms, fn) => timers.push({ ms, fn }), after: (ms, fn) => timers.push({ ms, fn }) };
 // cx.spawn starts the task; settle() waits for every task started so far, and the ones they start.
 const tasks = [];
+// URLs handed to the system browser (cx.open_url), newest last.
+export const opened = [];
 const cx = new Proxy({}, {
   get: (_, key) => {
     if (key === "timer") return timer;
     if (key === "spawn") return (fn) => tasks.push(fn(cx));
     if (key === "focus_handle") return () => ({ focus() {} });
+    if (key === "open_url") return (url) => opened.push(url);
     return () => {};
   },
 });

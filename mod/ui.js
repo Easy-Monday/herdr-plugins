@@ -1,7 +1,7 @@
 // The look: Herdr's own panel conventions as small components. Sizes and shapes follow
 // Branch PR's views/ui.js (munza/herdr-mods, Apache-2.0). UI only: values in, callbacks out.
 import { div, svg } from "gpui-kit";
-import { h_flex, v_flex } from "gpui-base";
+import { h_flex, v_flex, TextView } from "gpui-base";
 import { theme, settings } from "herdr";
 import { MOD } from "./src/name.js";
 import { statusColor } from "./src/status.js";
@@ -162,7 +162,10 @@ export function Chevron({ id, open, onClick }) {
     .cursor_pointer()
     .accessibility_label(open ? "Collapse sub-issues" : "Expand sub-issues")
     .hover((s) => s.bg(t.hover).text_color(t.foreground))
-    .on_click((_e, cx) => onClick(cx))
+    .on_click((_e, cx) => {
+      cx.stop_propagation(); // the row around it opens the issue
+      onClick(cx);
+    })
     .child(Icon(open ? "chevron-down" : "chevron-right", 12));
 }
 
@@ -206,10 +209,10 @@ export function Notice({ id, icon, title, detail, command, list, buttons = [] })
     .when(buttons.length > 0, (el) => el.child(h_flex().gap(8).children(buttons)));
 }
 
-export function Busy(label) {
+export function Busy(label, id = "board-loading") {
   const t = theme();
   return v_flex()
-    .id("board-loading")
+    .id(id)
     .flex_1()
     .min_h(0)
     .gap(10)
@@ -219,4 +222,68 @@ export function Busy(label) {
     .text_color(t.dim)
     .child(Icon("refresh", 20).spin(SPIN_MS).accessibility_label("Loading"))
     .child(label);
+}
+
+// Issue markdown; links (and Open image links) open in the system browser.
+export const Markdown = (id, text) =>
+  TextView.markdown(id, text)
+    .text_size(TEXT.body)
+    .w_full()
+    .min_w(0)
+    .scrollable(false)
+    .selectable(true)
+    .on_link_click((url, cx) => cx.open_url(url));
+
+// A part of the issue detail: its name and how many it holds.
+export function SectionLabel(label, count) {
+  const t = theme();
+  return h_flex()
+    .flex_none()
+    .gap(6)
+    .items_center()
+    .text_size(TEXT.small)
+    .font_medium()
+    .text_color(t.muted)
+    .child(label)
+    .when(count != null, (el) => el.child(div().font_normal().text_color(t.dim).child(String(count))));
+}
+
+// The GitHub issue type (Epic, Feature, Bug …), outlined so it reads apart from the Status pill.
+export function TypeTag(name) {
+  const t = theme();
+  return div()
+    .flex_none()
+    .h(18)
+    .px(6)
+    .flex()
+    .items_center()
+    .rounded(4)
+    .border_1()
+    .border_color(t.border)
+    .text_size(TEXT.caption)
+    .text_color(t.muted)
+    .child(name);
+}
+
+// Marks an agent handoff comment, with the accent bar beside it.
+export function HandoffTag(id) {
+  const t = theme();
+  return div()
+    .id(id)
+    .flex_none()
+    .h(18)
+    .px(6)
+    .flex()
+    .items_center()
+    .rounded(4)
+    .bg(tint(t.accent))
+    .text_size(TEXT.caption)
+    .font_medium()
+    .text_color(t.accent)
+    .child("Handoff");
+}
+
+export function Message(text) {
+  const t = theme();
+  return div().flex_none().text_size(TEXT.small).text_color(t.dim).whitespace_normal().child(text);
 }

@@ -4,7 +4,10 @@ import { v_flex, h_flex, ScrollHandle } from "gpui-base";
 import { theme, spaces, panes, checking, props } from "herdr";
 import { mock } from "./src/mock.js";
 import { detectRepo } from "./src/git.js";
-import { loadProjects, loadItems } from "./src/load.js";
+import { loadProjects, loadItems, loadIssue } from "./src/load.js";
+import { parseIssue } from "./src/issue.js";
+import { mergeActivity, isHandoff, relativeTime, statusLine } from "./src/activity.js";
+import { imageLinks } from "./src/images.js";
 import { pickProject, parseItems, buildTree, visibleRows, progress } from "./src/board.js";
 import { classifyError } from "./src/errors.js";
 import {
@@ -13,14 +16,19 @@ import {
   Button,
   Chevron,
   Header,
+  HandoffTag,
   Icon,
   IconButton,
   IssueNumber,
+  Markdown,
+  Message,
   Notice,
   Panel,
   Progress,
+  SectionLabel,
   StatusPill,
   TextButton,
+  TypeTag,
 } from "./ui.js";
 
 const CONTEXT_POLL_MS = 1000;
@@ -81,16 +89,21 @@ export default class ProjectBoard extends View {
     // Prototype only: open in a given state, e.g. props {"scenario": "big", "expand": ["I_1"]}.
     if (mock?.scenarios && given.scenario) mock.choose(given.scenario);
     this.startExpanded = mock?.scenarios ? (given.expand ?? []) : [];
+    this.startOpen = mock?.scenarios ? (given.open ?? null) : null; // e.g. "I_11": that issue's detail
     this.showDone = stored("show-done") === "on";
     this.screen = { kind: "loading" };
     this.loading = true;
     this.token = 0;
     this.prototypeOpen = false;
+    // Open issue details, the shown one last; Back goes one step up, then to the list.
+    this.trail = [];
     if (checking()) return;
     this.followFocus(cx);
     cx.timer.every(CONTEXT_POLL_MS, (cx) => this.followFocus(cx));
     cx.timer.every(REFRESH_MS, (cx) => {
       if (!this.loading) this.load(cx);
+      const shown = this.shown();
+      if (shown?.node.type === "Issue" && !shown.loading) this.loadDetail(shown, cx);
     });
   }
 
@@ -126,6 +139,7 @@ export default class ProjectBoard extends View {
           repo = found.repo;
           // A switch to another board shows it as it was left; the load below refreshes it.
           if (token === this.token && this.screen.repo !== repo) {
+            this.closeDetails();
             this.screen = this.board(repo).screen ?? { kind: "loading", repo };
             cx.notify();
           }
@@ -134,15 +148,23 @@ export default class ProjectBoard extends View {
           else if (pick.kind === "many") screen = { kind: "many-boards", repo, names: pick.names };
           else {
             const items = parseItems(await loadItems(pick.project.id));
-            screen = { kind: "board", repo, title: pick.project.title, tree: buildTree(items) };
+            screen = { kind: "board", repo, title: pick.project.title, project: pick.project, tree: buildTree(items) };
           }
         }
       } catch (e) {
         screen = { kind: classifyError(e), repo, message: e.message };
       }
       if (token !== this.token) return;
+      // An issue stays open over its own repo's board only (a failed refresh keeps it).
+      if (this.trail[0]?.repo !== repo) this.closeDetails();
       this.screen = { ...screen, folder: sp?.folder ?? null };
       if (screen.kind === "board") this.board(repo).screen = this.screen;
+      if (this.startOpen && screen.kind === "board") {
+        const find = (nodes) => nodes.map((n) => (n.key === this.startOpen ? n : find(n.children))).find(Boolean);
+        const node = find(screen.tree);
+        this.startOpen = null;
+        if (node) this.openDetail(node, cx);
+      }
       this.loading = false;
       cx.notify();
     });
@@ -160,8 +182,67 @@ export default class ProjectBoard extends View {
     cx.notify();
   }
 
+  shown() {
+    return this.trail[this.trail.length - 1] ?? null;
+  }
+
+  // A row or a sub-issue: the list makes way for its detail. Not callable from render (scroll handle).
+  openDetail(node, cx) {
+    const project = this.screen.project;
+    const url =
+      node.type === "DraftIssue" && project?.url && node.itemId
+        ? `${project.url}?pane=issue&itemId=${node.itemId}`
+        : node.url;
+    this.trail.push({
+      node: { ...node, url },
+      repo: this.screen.repo,
+      projectId: project?.id,
+      data: null,
+      error: null,
+      loading: false,
+      token: 0,
+      scroll: ScrollHandle.new(),
+    });
+    if (node.type === "Issue") this.loadDetail(this.shown(), cx);
+    cx.notify();
+  }
+
+  back(cx) {
+    this.trail.pop()?.scroll.release();
+    cx.notify();
+  }
+
+  closeDetails() {
+    for (const d of this.trail) d.scroll.release();
+    this.trail = [];
+  }
+
+  // A reload keeps what's shown, so the detail and its scroll stay put.
+  loadDetail(d, cx) {
+    const token = ++d.token;
+    d.loading = true;
+    cx.notify();
+    cx.spawn(async (cx) => {
+      let data = null;
+      let error = null;
+      try {
+        data = parseIssue(await loadIssue(d.node.key), d.projectId);
+      } catch (e) {
+        error = e.message;
+      }
+      if (token !== d.token) return;
+      if (data) d.data = data;
+      d.error = error;
+      d.loading = false;
+      cx.notify();
+    });
+  }
+
   render() {
-    const root = Panel("project-board").child(this.header(this.screen)).child(this.body(this.screen));
+    const shown = this.shown();
+    const root = shown
+      ? Panel("project-board").child(this.detailHeader(shown)).child(this.detailBody(shown))
+      : Panel("project-board").child(this.header(this.screen)).child(this.body(this.screen));
     return mock?.scenarios ? root.child(this.prototypeBar()) : root;
   }
 
@@ -311,8 +392,7 @@ export default class ProjectBoard extends View {
       .child(div().flex_1().min_w(0).truncate().child(node.title))
       .when(node.number != null, (el) => el.child(IssueNumber(node.number)));
     if (depth)
-      return h_flex()
-        .id(`row-${node.key}`)
+      return this.clickable(h_flex(), node)
         .flex_none()
         .h(28)
         .pl(depth * 20)
@@ -322,8 +402,7 @@ export default class ProjectBoard extends View {
         .child(titleLine.flex_1().min_w(0))
         .when(Boolean(node.status), (el) => el.child(StatusPill(node.status)));
     const percent = progress(node.summary);
-    return v_flex()
-      .id(`row-${node.key}`)
+    return this.clickable(v_flex(), node)
       .flex_none()
       .px(4)
       .py(5)
@@ -341,6 +420,219 @@ export default class ProjectBoard extends View {
             .when(percent !== null, (row) => row.child(Progress(percent))),
         ),
       );
+  }
+
+  clickable(el, node) {
+    const t = theme();
+    return el
+      .id(`row-${node.key}`)
+      .rounded(6)
+      .cursor_pointer()
+      .hover((s) => s.bg(t.hover))
+      .on_click((_e, cx) => this.openDetail(node, cx));
+  }
+
+  // Back, then what this is: state, type, #number and Status; the title under it.
+  detailHeader(d) {
+    const t = theme();
+    const issue = d.data ?? d.node;
+    const [icon, color, label] = stateIcon(issue, t);
+    const above = this.trail[this.trail.length - 2];
+    const actions = [];
+    if (d.node.type === "Issue")
+      actions.push(
+        IconButton({
+          id: "refresh",
+          icon: "refresh",
+          label: "Refresh issue",
+          spinning: d.loading,
+          onClick: (cx) => this.loadDetail(d, cx),
+        }),
+      );
+    if (issue.url)
+      actions.push(
+        IconButton({
+          id: "open-github",
+          icon: "external-link",
+          label: "Open on GitHub",
+          onClick: (cx) => cx.open_url(issue.url),
+        }),
+      );
+    return v_flex()
+      .id("detail-header")
+      .flex_none()
+      .pl(6)
+      .pr(12)
+      .py(8)
+      .gap(2)
+      .border_b(1)
+      .border_color(t.border)
+      .child(
+        h_flex()
+          .gap(6)
+          .items_center()
+          .child(
+            IconButton({
+              id: "back",
+              icon: "chevron-left",
+              label: above?.node.number != null ? `Back to #${above.node.number}` : "Back to the board",
+              onClick: (cx) => this.back(cx),
+            }),
+          )
+          .child(Icon(icon, 15).text_color(color).accessibility_label(label))
+          .when(Boolean(issue.issueType), (el) => el.child(TypeTag(issue.issueType)))
+          .when(issue.number != null, (el) => el.child(IssueNumber(issue.number)))
+          .when(Boolean(issue.status), (el) => el.child(StatusPill(issue.status)))
+          .child(div().flex_1())
+          .children(actions),
+      )
+      .child(div().pl(53).pr(4).font_medium().whitespace_normal().child(issue.title));
+  }
+
+  detailBody(d) {
+    const t = theme();
+    if (d.node.type !== "Issue") {
+      const pr = d.node.type === "PullRequest";
+      return Notice({
+        id: "not-an-issue",
+        icon: pr ? "pull-request" : "draft",
+        title: pr ? "Pull requests open on GitHub" : "Draft issues open on GitHub",
+        detail: pr
+          ? "This panel reads issues. The pull request's conversation, checks and files are on GitHub."
+          : "A draft issue lives only on the board, so there is nothing more to show here.",
+        buttons: d.node.url
+          ? [
+              Button({
+                id: "open-github-big",
+                label: "Open on GitHub",
+                primary: true,
+                onClick: (cx) => cx.open_url(d.node.url),
+              }),
+            ]
+          : [],
+      });
+    }
+    const retry = (cx) => this.loadDetail(d, cx);
+    if (!d.data && d.error)
+      return Notice({
+        id: "detail-error",
+        icon: "alert",
+        title: `#${d.node.number} didn't load`,
+        detail: d.error,
+        buttons: [Button({ id: "detail-try-again", label: "Try again", primary: true, onClick: retry })],
+      });
+    if (!d.data) return Busy(`Loading #${d.node.number}…`, "detail-loading");
+    const issue = d.data;
+    const activity = mergeActivity(issue.comments, issue.events);
+    const now = Date.now();
+    return v_flex()
+      .id(`detail-${d.node.key}`)
+      .flex_1()
+      .min_h(0)
+      .overflow_y_scrollbar()
+      .track_scroll(d.scroll)
+      .px(14)
+      .py(12)
+      .gap(18)
+      .when(Boolean(d.error), (el) =>
+        el.child(
+          h_flex()
+            .id("detail-stale")
+            .flex_none()
+            .gap(8)
+            .items_center()
+            .text_size(TEXT.small)
+            .text_color(t.ansi1)
+            .child(div().flex_1().min_w(0).whitespace_normal().child(`Couldn't refresh: ${d.error}`))
+            .child(TextButton({ id: "detail-try-again", label: "Try again", onClick: retry })),
+        ),
+      )
+      .child(issue.body.trim() ? Markdown(`body-${issue.key}`, imageLinks(issue.body)) : Message("No description."))
+      .when(issue.subIssues.length > 0, (el) =>
+        el.child(
+          v_flex()
+            .id("sub-issues")
+            .flex_none()
+            .gap(4)
+            .child(SectionLabel("Sub-issues", issue.subIssues.length))
+            .child(v_flex().mx(-6).children(issue.subIssues.map((s) => this.subRow(s)))),
+        ),
+      )
+      .child(
+        v_flex()
+          .id("activity")
+          .flex_none()
+          .gap(12)
+          .child(SectionLabel("Activity", activity.length))
+          .when(!activity.length, (el) => el.child(Message("No comments or Status changes yet.")))
+          .children(activity.map((a) => (a.kind === "comment" ? this.comment(a, now) : this.statusChange(a, now)))),
+      );
+  }
+
+  subRow(s) {
+    const t = theme();
+    const [icon, color, label] = stateIcon(s, t);
+    return h_flex()
+      .id(`sub-${s.key}`)
+      .flex_none()
+      .h(28)
+      .px(6)
+      .gap(6)
+      .items_center()
+      .rounded(6)
+      .cursor_pointer()
+      .hover((st) => st.bg(t.hover))
+      .on_click((_e, cx) => this.openDetail(s, cx))
+      .child(Icon(icon, 15).text_color(color).accessibility_label(label))
+      .child(div().flex_1().min_w(0).truncate().child(s.title))
+      .child(IssueNumber(s.number))
+      .when(Boolean(s.status), (el) => el.child(StatusPill(s.status)));
+  }
+
+  // A handoff gets the accent bar and its tag; every comment keeps the same text edge.
+  comment(c, now) {
+    const t = theme();
+    const handoff = isHandoff(c.body);
+    return v_flex()
+      .id(`comment-${c.id}`)
+      .flex_none()
+      .min_w(0)
+      .gap(4)
+      .ml(-10)
+      .pl(8)
+      .border_l(2)
+      .border_color(handoff ? t.accent : t.background)
+      .child(
+        h_flex()
+          .gap(6)
+          .items_center()
+          .child(div().flex_none().font_medium().text_size(TEXT.small).child(c.author?.login ?? "ghost"))
+          .child(
+            div()
+              .flex_1()
+              .min_w(0)
+              .truncate()
+              .text_size(TEXT.caption)
+              .text_color(t.dim)
+              .child(relativeTime(c.createdAt, now)),
+          )
+          .when(handoff, (el) => el.child(HandoffTag(`handoff-${c.id}`))),
+      )
+      .child(Markdown(`comment-body-${c.id}`, imageLinks(c.body || "")));
+  }
+
+  statusChange(e, now) {
+    const t = theme();
+    return h_flex()
+      .id(`status-${e.id}`)
+      .flex_none()
+      .min_w(0)
+      .gap(6)
+      .items_center()
+      .text_size(TEXT.caption)
+      .text_color(t.dim)
+      .child(Icon("board", 12))
+      .child(div().flex_1().min_w(0).truncate().child(statusLine(e, now)));
   }
 
   // Prototype installs only: pick the state to look at.
@@ -386,6 +678,7 @@ export default class ProjectBoard extends View {
                   onClick: (cx) => {
                     mock.choose(s.id);
                     this.screen = { kind: "loading" };
+                    this.closeDetails();
                     // shortcut: drops the old handles unreleased (a few per click); prototype only.
                     this.boards.clear();
                     this.load(cx);

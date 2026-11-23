@@ -1,4 +1,4 @@
-// Prototype self-check for epic #1: each click path of the handoff, run against a prototype
+// Prototype self-check for epics #1 and #10: each click path of the handoff, run against a prototype
 // install (mock layer on, as `npm run prototype` writes it). The stories' tests replace it.
 // Herdr-only behaviour (real scroll offsets, smooth scrolling, a remote machine, localStorage
 // across a reload) is tested here up to the state the harness can reach; the owner confirms
@@ -10,7 +10,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { herdrStub, mount, settle, click, byId, text, walk, timers, cx } from "../support/harness.js";
+import { herdrStub, mount, settle, click, byId, text, walk, timers, cx, opened } from "../support/harness.js";
 
 const script = new URL("../../scripts/install.sh", import.meta.url).pathname;
 const home = mkdtempSync(join(tmpdir(), "herdr-proto-"));
@@ -230,7 +230,7 @@ test("#4 AC-4: a native spinner shows while the first load runs", async () => {
 
 test("#5 AC-1: top-level rows in board order with state icon, title and #number", async () => {
   const app = await open();
-  assert.deepEqual(rows(app), ["I_1", "I_10", "I_26", "PR_29", "PR_30", "DI_1", "I_27", "I_32", "I_33", "I_16"]);
+  assert.deepEqual(rows(app), ["I_1", "I_10", "I_26", "PR_29", "PR_30", "DI_1", "I_27", "I_32", "I_33", "I_40"]);
   const first = row(app, "I_1");
   assert.match(text(first), /Epic: Project board panel/);
   assert.match(text(first), /#1/);
@@ -253,7 +253,7 @@ test("#5 AC-3: progress bar and percentage of closed sub-issues", async () => {
   const app = await open();
   assert.match(text(row(app, "I_1")), /13%/);
   assert.match(text(row(app, "I_10")), /0%/);
-  assert.match(text(row(app, "I_16")), /50%/);
+  assert.match(text(row(app, "I_40")), /50%/);
   assert.doesNotMatch(text(row(app, "I_26")), /%/);
 });
 
@@ -325,12 +325,12 @@ test("#7 AC-1: Done top-level items are hidden until Show done is on", async () 
 test("#7 AC-2: Done sub-issues of an expanded parent show either way", async () => {
   const app = await open();
   await press(app, "chevron-I_1");
-  await press(app, "chevron-I_16");
+  await press(app, "chevron-I_40");
   assert.ok(rows(app).includes("I_8"));
-  assert.ok(rows(app).includes("I_18"));
+  assert.ok(rows(app).includes("I_42"));
   await press(app, "show-done");
   assert.ok(rows(app).includes("I_8"));
-  assert.ok(rows(app).includes("I_18"));
+  assert.ok(rows(app).includes("I_42"));
   await press(app, "show-done");
 });
 
@@ -399,4 +399,234 @@ test("#8 AC-4: a tab switch and back keeps scroll and expanded rows on the same 
   await switchTo(app, tabs, "t1"); // back
   assert.equal(scrollHandle(app), handle);
   assert.ok(rows(app).includes("I_2"));
+});
+
+// Epic #10: Issue detail. Herdr-only: how markdown draws, and the real scroll offset; the owner
+// confirms those in Herdr. Here: what each view holds and what each click does.
+
+const HERDR = "https://github.com/Easy-Monday/herdr-plugins";
+async function detail(key, app) {
+  app ??= await open();
+  if (!byId(app.tree(), `row-${key}`)) await press(app, "chevron-I_10"); // #10's stories sit under it
+  await press(app, `row-${key}`);
+  return app;
+}
+const part = (app, id) => byId(app.tree(), id);
+const activity = (app) => {
+  const ids = [];
+  walk(part(app, "activity"), (n) => {
+    const id = n.props.id ?? "";
+    if (/^(comment|status)-(?!body)/.test(id)) ids.push(id);
+  });
+  return ids;
+};
+const markdownOf = (app, id) => {
+  const node = part(app, id);
+  assert.equal(node?.kind, "markdown", `#${id} is markdown`);
+  return node;
+};
+
+// #11 Open an issue's detail
+
+test("#11 AC-1: a top-level or sub-issue row opens its detail in place of the list; Back returns", async () => {
+  const app = await detail("I_10");
+  assert.equal(part(app, "board-list"), null);
+  assert.ok(part(app, "detail-I_10"));
+  await press(app, "back");
+  assert.ok(part(app, "board-list"));
+  await press(app, "chevron-I_1");
+  await detail("I_2", app); // a sub-issue row
+  assert.ok(part(app, "detail-I_2"));
+  assert.equal(byId(app.tree(), "back").props.accessibility_label, "Back to the board");
+  await press(app, "back");
+  assert.ok(rows(app).includes("I_2")); // the list as it was left
+});
+
+test("#11 AC-2: the header has type, title, #number, Status and Open on GitHub", async () => {
+  const app = await detail("I_10");
+  const header = text(part(app, "detail-header"));
+  for (const part of ["Epic", "Epic: Issue detail", "#10", "In Progress"]) assert.ok(header.includes(part), part);
+  await press(app, "open-github");
+  assert.equal(opened.at(-1), `${HERDR}/issues/10`);
+  await press(app, "back");
+  await detail("I_32", app); // no issue type, no Status
+  assert.doesNotMatch(text(part(app, "detail-header")), /Epic|Feature|Bug|Task/);
+  assert.deepEqual(pills(part(app, "detail-header")), []);
+});
+
+test("#11 AC-3: the body renders as markdown", async () => {
+  const app = await detail("I_10");
+  const body = text(markdownOf(app, "body-I_10"));
+  assert.match(body, /^## Goal/);
+  assert.match(body, /\n- AC-1: Given the board list/);
+});
+
+test("#11 AC-4: a pull request or draft issue row offers only Open on GitHub", async () => {
+  const app = await detail("PR_29");
+  assert.ok(part(app, "not-an-issue"));
+  for (const id of ["refresh", "activity", "sub-issues", "detail-PR_29"]) assert.equal(part(app, id), null, id);
+  await press(app, "open-github-big");
+  assert.equal(opened.at(-1), `${HERDR}/pull/29`);
+  await press(app, "back");
+  await detail("DI_1", app);
+  assert.match(app.text(), /Draft issues open on GitHub/);
+  await press(app, "open-github-big");
+  assert.equal(opened.at(-1), "https://github.com/orgs/Easy-Monday/projects/11?pane=issue&itemId=140213");
+});
+
+// Not an AC: the detail's own loading, error and empty states, as the Prototype bar picks them.
+test("#11 states: issue loading, issue API error with Try again, and an empty issue", async () => {
+  const app = await open();
+  await pick(app, "detail-loading");
+  click(app.tree(), "row-I_10");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(app.text(), /Loading #10…/);
+  assert.equal(byId(app.tree(), "refresh").kids[0].props.spin, 900);
+  await pick(app, "detail-error"); // releases the held load
+  await detail("I_10", app);
+  assert.match(app.text(), /#10 didn't load/);
+  assert.match(app.text(), /HTTP 502/);
+  await press(app, "detail-try-again");
+  assert.ok(part(app, "detail-I_10"));
+  await press(app, "back");
+  await pick(app, "board");
+  await detail("I_33", app);
+  assert.match(app.text(), /No description\./);
+  assert.match(app.text(), /No comments or Status changes yet\./);
+  assert.equal(part(app, "sub-issues"), null);
+});
+
+// #12 Sub-issues in the issue detail
+
+test("#12 AC-1: the detail lists each sub-issue's state, title, number and Status", async () => {
+  const app = await detail("I_10");
+  const subs = [];
+  walk(part(app, "sub-issues"), (n) => {
+    if (n.props.id?.startsWith("sub-I_")) subs.push(n.props.id);
+  });
+  assert.deepEqual(subs, ["sub-I_11", "sub-I_12", "sub-I_13", "sub-I_14", "sub-I_15", "sub-I_16", "sub-I_17"]);
+  const first = part(app, "sub-I_11");
+  assert.match(text(first), /Open an issue's detail/);
+  assert.match(text(first), /#11/);
+  assert.deepEqual(pills(first).map((p) => p.name), ["In Review"]);
+  let state = null;
+  walk(first, (n) => {
+    if (n.kind === "svg") state ??= n.props.accessibility_label;
+  });
+  assert.equal(state, "Open");
+});
+
+test("#12 AC-2: clicking a sub-issue opens its detail; Back walks up to the epic, then the list", async () => {
+  const app = await detail("I_10");
+  await press(app, "sub-I_11");
+  assert.ok(part(app, "detail-I_11"));
+  assert.equal(byId(app.tree(), "back").props.accessibility_label, "Back to #10");
+  await press(app, "back");
+  assert.ok(part(app, "detail-I_10"));
+  await press(app, "back");
+  assert.ok(part(app, "board-list"));
+});
+
+// #13 Activity: comments and status changes
+
+test("#13 AC-1: comments and Status changes in one list, oldest first", async () => {
+  const app = await detail("I_11");
+  assert.deepEqual(activity(app), [
+    "status-PVTISC_11_0",
+    "status-PVTISC_11_1",
+    "comment-IC_11_0",
+    "status-PVTISC_11_2",
+    "status-PVTISC_11_3",
+    "comment-IC_11_1",
+    "status-PVTISC_11_4",
+    "comment-IC_11_2",
+  ]);
+});
+
+test("#13 AC-2: a comment shows author, relative time and its markdown body", async () => {
+  const app = await detail("I_11");
+  const comment = text(part(app, "comment-IC_11_0"));
+  assert.match(comment, /^S4n3L 2h ago/);
+  assert.match(text(markdownOf(app, "comment-body-IC_11_0")), /^Tests written at 9f3c2e1/);
+  assert.match(text(part(app, "comment-IC_11_1")), /40m ago/);
+});
+
+test("#13 AC-3: a Status change is one line: previous → status · relative time", async () => {
+  const app = await detail("I_11");
+  assert.equal(text(part(app, "status-PVTISC_11_4")).trim(), "In Progress → In Review · 25m ago");
+  assert.equal(text(part(app, "status-PVTISC_11_0")).trim(), "Backlog → Specified · 3d ago");
+});
+
+// #14 Highlight agent handoff comments
+
+test("#14 AC-1: Tests written at / Prototype handoff at comments get the accent bar and Handoff label", async () => {
+  const app = await detail("I_11");
+  assert.match(text(part(app, "handoff-IC_11_0")), /Handoff/);
+  assert.equal(part(app, "comment-IC_11_0").props.border_color, "theme.accent");
+  await press(app, "back");
+  await detail("I_10", app);
+  assert.ok(part(app, "handoff-IC_10_1")); // Prototype handoff at …
+  assert.equal(part(app, "comment-IC_10_1").props.border_color, "theme.accent");
+});
+
+test("#14 AC-2: any other comment has neither, even one quoting a handoff below its first line", async () => {
+  const app = await detail("I_11");
+  for (const id of ["IC_11_1", "IC_11_2"]) {
+    assert.equal(part(app, `handoff-${id}`), null, id);
+    assert.notEqual(part(app, `comment-${id}`).props.border_color, "theme.accent", id);
+  }
+  await press(app, "back");
+  await detail("I_10", app);
+  assert.equal(part(app, "handoff-IC_10_2"), null); // Prototype coverage at …
+});
+
+// #15 Images as Open image links
+
+test("#15 AC-1: markdown and HTML images become Open image links, labelled by alt text or file name", async () => {
+  const app = await detail("I_15");
+  const body = text(markdownOf(app, "body-I_15"));
+  assert.ok(body.includes(`[Open image: Detail header with Status](${HERDR}/blob/2c4d8e0/docs/screenshots/11/header.png?raw=true)`));
+  assert.doesNotMatch(body, /!\[/);
+  const html = text(markdownOf(app, "comment-body-IC_15_0"));
+  assert.ok(html.includes(`[Open image: open-image-link.png](${HERDR}/blob/5b7e0c2/docs/screenshots/15/open-image-link.png?raw=true)`));
+  assert.doesNotMatch(html, /<img/);
+  await press(app, "back");
+  await detail("I_11", app);
+  assert.match(text(part(app, "comment-body-IC_11_1")), /\[Open image: back-to-board\.png\]/);
+});
+
+// Herdr-only: the click lands on the link inside the drawn markdown. Here: the view's link handler.
+test("#15 AC-2: an Open image link opens the image URL in the system browser", async () => {
+  const app = await detail("I_15");
+  const url = `${HERDR}/blob/2c4d8e0/docs/screenshots/11/header.png?raw=true`;
+  markdownOf(app, "body-I_15").handlers.on_link_click(url, cx);
+  assert.equal(opened.at(-1), url);
+});
+
+// #16 Issue detail stays current
+
+test("#16 AC-1: the refresh interval reloads the open detail, bringing in new comments", async () => {
+  const app = await detail("I_16");
+  const before = activity(app).length;
+  const refresh = app.timers.filter((t) => t.ms === 60000);
+  assert.equal(refresh.length, 1);
+  refresh[0].fn(cx);
+  await settle();
+  const after = activity(app);
+  assert.equal(after.length, before + 1);
+  assert.equal(after.at(-1), "comment-IC_16_new1");
+  assert.ok(part(app, "handoff-IC_16_new1")); // a Tests written at … that came in while reading
+  await press(app, "refresh"); // the header's refresh does the same
+  assert.equal(activity(app).length, before + 2);
+});
+
+// Herdr-only: the real scroll offset. Here: the detail stays mounted with the same scroll handle.
+test("#16 AC-2: a refresh keeps the same issue open at the same scroll position", async () => {
+  const app = await detail("I_16");
+  const handle = part(app, "detail-I_16").props.track_scroll;
+  app.timers.find((t) => t.ms === 60000).fn(cx);
+  assert.equal(part(app, "detail-I_16").props.track_scroll, handle); // during the load
+  await settle();
+  assert.equal(part(app, "detail-I_16").props.track_scroll, handle);
+  assert.equal(part(app, "board-list"), null);
 });

@@ -28,17 +28,24 @@ function find(tree, pred) {
   return found;
 }
 
-test("should reload at the refreshSeconds block prop's interval, not the default", async () => {
+test("should reload at the refreshSeconds block prop's interval from props(), not init's argument", async () => {
   const s = randomUUID().slice(0, 8);
   let title = `Ready ${s}`;
   world(`/w/${s}`, `own-${s}/web-${s}`, () => boards(title));
-  const { render } = await mount({ refreshSeconds: 120 });
-  await tick();
-  title = `Moved ${s}`;
-  await advance(60_000); // 61 s
-  assert.ok(text(render()).includes(`Ready ${s}`), `reloaded before 120 s: ${text(render())}`);
-  await advance(59_000); // 120 s
-  assert.ok(text(render()).includes(`Moved ${s}`), `no reload at 120 s: ${text(render())}`);
+  // Herdr documents the block's props as props(); init's first argument gets 60 here, so reading it fails.
+  Object.defineProperty(herdrStub, "props", { configurable: true, get: () => ({ refreshSeconds: 120 }), set() {} });
+  try {
+    const { render } = await mount({ refreshSeconds: 60 });
+    await tick();
+    title = `Moved ${s}`;
+    await advance(60_000); // 61 s
+    assert.ok(text(render()).includes(`Ready ${s}`), `reloaded before 120 s: ${text(render())}`);
+    await advance(59_000); // 120 s
+    assert.ok(text(render()).includes(`Moved ${s}`), `no reload at 120 s: ${text(render())}`);
+  } finally {
+    delete herdrStub.props;
+    herdrStub.props = {};
+  }
 });
 
 test("should keep the error notice and spin the header refresh icon while Try again reloads", async () => {

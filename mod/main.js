@@ -1,7 +1,7 @@
 // Project Board: a read-only panel showing the GitHub project board of the active tab's repo.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, ScrollHandle } from "gpui-base";
-import { theme, spaces, panes, checking } from "herdr";
+import { theme, spaces, panes, checking, props } from "herdr";
 import { activeSpace } from "./src/repo.js";
 import { detectRepo } from "./src/git.js";
 import { loadProjects, loadItems } from "./src/load.js";
@@ -155,7 +155,7 @@ async function findBoard(repo) {
 }
 
 export default class ProjectBoard extends View {
-  init(props, cx) {
+  init(_props, cx) {
     this.lastFolder = new Map();
     // Per repo: its expanded rows, scroll position and last loaded board, kept while the panel
     // shows another board or is hidden. A hidden copy isn't drawn, so the list's own scroll
@@ -169,7 +169,7 @@ export default class ProjectBoard extends View {
     this.followFocus(cx);
     cx.timer.every(CONTEXT_POLL_MS, (cx) => this.followFocus(cx));
     // Timers run while hidden too, so this is the only poll of GitHub: never faster than the setting.
-    cx.timer.every(refreshSeconds(props) * 1000, (cx) => {
+    cx.timer.every(refreshSeconds(props()) * 1000, (cx) => {
       if (!this.loading) this.load(cx);
     });
   }

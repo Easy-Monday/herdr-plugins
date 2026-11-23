@@ -2,14 +2,29 @@
 import { herdrStub } from "herdr";
 export { herdrStub };
 
-const timer = { every() {}, after() {} };
+// cx.timer.every/after calls, newest last: { ms, fn }. Tests fire them by hand.
+export const timers = [];
+const timer = { every: (ms, fn) => timers.push({ ms, fn }), after: (ms, fn) => timers.push({ ms, fn }) };
+// cx.spawn starts the task; settle() waits for every task started so far, and the ones they start.
+const tasks = [];
 const cx = new Proxy({}, {
-  get: (_, key) => (key === "timer" ? timer : key === "focus_handle" ? () => ({ focus() {} }) : () => {}),
+  get: (_, key) => {
+    if (key === "timer") return timer;
+    if (key === "spawn") return (fn) => tasks.push(fn(cx));
+    if (key === "focus_handle") return () => ({ focus() {} });
+    return () => {};
+  },
 });
+export { cx };
 
-export async function mount(props = {}) {
+export async function settle() {
+  while (tasks.length) await tasks.shift();
+}
+
+// `main`: the View module to mount, e.g. a prototype install's main.js (a file URL).
+export async function mount(props = {}, main = "../../mod/main.js") {
   herdrStub.props = props;
-  const { default: Mod } = await import("../../mod/main.js");
+  const { default: Mod } = await import(main);
   const view = new Mod();
   await view.init?.(props, cx);
   return { view, render: () => view.render(cx) };

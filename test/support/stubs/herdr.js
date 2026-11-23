@@ -8,6 +8,7 @@ export const spaces = () => herdrStub.spaces;
 export const panes = () => herdrStub.panes;
 export const home = () => "/home/test";
 export const appHome = () => "/home/test/.config/herdr-app";
+export const settings = () => ({ dark: true });
 export const run = () => null;
 export const exec = (command, args = [], options = {}) => {
   if (!herdrStub.exec) return Promise.reject(new Error(`unstubbed exec: ${command} ${args.join(" ")}`));

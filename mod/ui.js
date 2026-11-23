@@ -30,8 +30,8 @@ export function Panel(id) {
     .text_size(TEXT.body);
 }
 
-// Board name over owner/repo.
-export function Header({ title, subtitle }) {
+// Board name over owner/repo, then the header's controls.
+export function Header({ title, subtitle, actions = [] }) {
   const t = theme();
   return h_flex()
     .h(46)
@@ -50,7 +50,31 @@ export function Header({ title, subtitle }) {
         .when(Boolean(subtitle), (el) =>
           el.child(div().text_size(TEXT.caption).text_color(t.dim).truncate().child(subtitle)),
         ),
-    );
+    )
+    .children(actions);
+}
+
+// A small labelled toggle, from the approved epic #1 prototype (cac901d).
+export function TextButton({ id, icon, label, active = false, onClick }) {
+  const t = theme();
+  return h_flex()
+    .id(id)
+    .h(22)
+    .flex_none()
+    .px(6)
+    .gap(4)
+    .items_center()
+    .rounded(4)
+    .text_size(TEXT.caption)
+    .text_color(active ? t.foreground : t.dim)
+    .when(active, (el) => el.bg(t.selected))
+    .role("button")
+    .aria_selected(Boolean(active))
+    .cursor_pointer()
+    .hover((s) => s.bg(t.hover).text_color(t.foreground))
+    .on_click((_e, cx) => onClick(cx))
+    .when(Boolean(icon), (el) => el.child(Icon(icon, 12)))
+    .child(label);
 }
 
 // StatusPill, Progress and IssueNumber follow the approved epic #1 prototype (epic/1-prototype, cac901d).

@@ -100,10 +100,10 @@ Priority: Must
 Release: MVP
 Show a plain message (and, where useful, what to run) for: folder is not a git repo; no GitHub remote; `gh` not installed; `gh` not logged in or missing the `project` scope (`gh auth refresh -s project`); network or API error (with "Try again"). A loading indicator while the first load runs (native animation, not a timer).
 
-### 4.10 Placement in the owner's Herdr window
+### 4.10 Placement in a Herdr window
 Priority: Must
 Release: MVP
-The mod ships with `"place": "none"`. In the owner's layout `my-layout` (a clone of `main`), add a block for it as another child of the right panel's `panel-body` stack, next to `files`, `changes` and `pull-requests`, and a **Board** button in the owner's tab bar clone `my-tabs`, the same way the PRs button was added (`mods/my-tabs/main.js`, `panelButton(...)`).
+The mod ships with `"place": "none"`, so installing it changes no one's layout. The README explains how to place it: add a block for it as another child of the right panel's `panel-body` stack in a clone of the `main` layout (next to `files`, `changes` and `pull-requests`), and a **Board** button in a clone of the tab bar, the way Branch PR's PRs button is added (`panelButton(...)`). The owner's own placement (`my-layout`, `my-tabs`) is a local task, not part of the mod. (Changed 2026-11-23: the mod is to be published as open source.)
 
 ### 4.11 Images in issue bodies and comments as links
 Priority: Must

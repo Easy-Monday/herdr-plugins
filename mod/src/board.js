@@ -24,7 +24,8 @@ export function parseItems(pages) {
         isDraft: Boolean(c.isDraft),
         status: n.status?.name ? { name: n.status.name, color: n.status.color ?? null } : null,
         summary: c.subIssuesSummary ?? null,
-        subIssues: c.subIssues?.nodes ?? [],
+        // GitHub sends null for a sub-issue the login can't see (e.g. in a private repo).
+        subIssues: (c.subIssues?.nodes ?? []).filter(Boolean),
       };
     });
 }
@@ -59,6 +60,18 @@ export function buildTree(items) {
   // Items in a loop have no top item; show them at top level rather than lose them.
   for (const i of items) if (!seen.has(i.key)) tree.push(node(i, []));
   return tree;
+}
+
+// The rows on screen, depth first: Done top-level items only with showDone (a Done parent hides its
+// open sub-issues too, BRD §12); the children of expanded rows always, Done or not.
+export function visibleRows(tree, { showDone, expanded }) {
+  const rows = [];
+  const add = (node, depth) => {
+    rows.push({ node, depth });
+    if (expanded.has(node.key)) for (const child of node.children) add(child, depth + 1);
+  };
+  for (const node of tree) if (showDone || node.status?.name !== "Done") add(node, 0);
+  return rows;
 }
 
 // Closed over all sub-issues, in whole percent; null without sub-issues.

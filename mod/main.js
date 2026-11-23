@@ -5,11 +5,25 @@ import { theme, spaces, panes, checking } from "herdr";
 import { activeSpace } from "./src/repo.js";
 import { detectRepo } from "./src/git.js";
 import { loadProjects, loadItems } from "./src/load.js";
-import { pickProject, parseItems, buildTree, progress } from "./src/board.js";
+import { pickProject, parseItems, buildTree, visibleRows, progress } from "./src/board.js";
 import { classifyError } from "./src/errors.js";
-import { Panel, Header, Notice, Busy, Button, Icon, IssueNumber, StatusPill, Progress, Chevron } from "./ui.js";
+import { Panel, Header, Notice, Busy, Button, TextButton, Icon, IssueNumber, StatusPill, Progress, Chevron } from "./ui.js";
 
 const CONTEXT_POLL_MS = 1000;
+
+// localStorage can be missing (tests) or refuse; the toggle then just isn't remembered.
+const stored = (key) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const store = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {}
+};
 
 const NOTICES = {
   "not-git": () => ({
@@ -126,13 +140,6 @@ function Row({ node, depth }, open, onToggle) {
     );
 }
 
-// The rows on screen: every top-level item, and the children of expanded rows, depth first.
-const shown = (nodes, expanded, depth = 0) =>
-  nodes.flatMap((node) => [
-    { node, depth },
-    ...(expanded.has(node.key) ? shown(node.children, expanded, depth + 1) : []),
-  ]);
-
 // The linked boards of a repo, and the one board's items, as a screen state.
 async function findBoard(repo) {
   try {
@@ -151,6 +158,7 @@ export default class ProjectBoard extends View {
     this.lastFolder = new Map();
     // Keys of the expanded rows. shortcut: one set for every board; story #8 keeps it per board.
     this.expanded = new Set();
+    this.showDone = stored("show-done") === "on";
     this.screen = { kind: "loading" };
     this.token = 0;
     if (checking()) return;
@@ -206,29 +214,53 @@ export default class ProjectBoard extends View {
     cx.notify();
   }
 
+  toggleDone(cx) {
+    this.showDone = !this.showDone;
+    store("show-done", this.showDone ? "on" : "off");
+    cx.notify();
+  }
+
   render() {
     const s = this.screen;
     const tryAgain = Button({ id: "try-again", label: "Try again", primary: true, onClick: (cx) => this.retry(cx) });
     const notice = NOTICES[s.kind]?.(s, tryAgain);
+    const showDone = TextButton({
+      id: "show-done",
+      icon: this.showDone ? "check" : null,
+      label: "Show done",
+      active: this.showDone,
+      onClick: (cx) => this.toggleDone(cx),
+    });
     return Panel("project-board")
-      .child(Header({ title: s.kind === "board" ? s.title : "Project Board", subtitle: s.repo ?? s.folder }))
+      .child(
+        Header({
+          title: s.kind === "board" ? s.title : "Project Board",
+          subtitle: s.repo ?? s.folder,
+          actions: s.kind === "board" ? [showDone] : [],
+        }),
+      )
       .when(s.kind === "loading", (el) => el.child(Busy("Loading the board…")))
       .when(Boolean(notice), (el) => el.child(Notice({ id: s.kind, ...notice })))
-      .when(s.kind === "board", (el) =>
-        el.child(
-          v_flex()
-            .id("board-list")
-            .flex_1()
-            .min_h(0)
-            .overflow_y_scrollbar()
-            .px(6)
-            .py(4)
-            .children(
-              shown(s.tree, this.expanded).map((row) =>
-                Row(row, this.expanded.has(row.node.key), (cx) => this.toggle(row.node.key, cx)),
-              ),
-            ),
-        ),
-      );
+      .when(s.kind === "board", (el) => el.child(this.list(s.tree)));
+  }
+
+  // The board's rows, or a notice when none show (wording from the approved epic #1 prototype).
+  list(tree) {
+    const rows = visibleRows(tree, { showDone: this.showDone, expanded: this.expanded });
+    if (!rows.length)
+      return Notice({
+        id: "board-empty",
+        icon: "board",
+        title: tree.length ? "Everything on this board is done" : "This board has no items yet",
+        detail: tree.length ? "Turn on Show done to see finished items." : null,
+      });
+    return v_flex()
+      .id("board-list")
+      .flex_1()
+      .min_h(0)
+      .overflow_y_scrollbar()
+      .px(6)
+      .py(4)
+      .children(rows.map((row) => Row(row, this.expanded.has(row.node.key), (cx) => this.toggle(row.node.key, cx))));
   }
 }

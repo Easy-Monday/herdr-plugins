@@ -1,11 +1,12 @@
 // Project Board: a read-only panel showing the GitHub project board of the active tab's repo.
-import { View } from "gpui-kit";
-import { spaces, panes, checking } from "herdr";
+import { View, div } from "gpui-kit";
+import { v_flex, h_flex } from "gpui-base";
+import { theme, spaces, panes, checking } from "herdr";
 import { activeSpace } from "./src/repo.js";
 import { detectRepo } from "./src/git.js";
-import { loadProjects } from "./src/load.js";
-import { pickProject } from "./src/board.js";
-import { Panel, Header, Notice } from "./ui.js";
+import { loadProjects, loadItems } from "./src/load.js";
+import { pickProject, parseItems, progress } from "./src/board.js";
+import { Panel, Header, Notice, Icon, IssueNumber, StatusPill, Progress } from "./ui.js";
 
 const CONTEXT_POLL_MS = 1000;
 
@@ -36,17 +37,64 @@ const NOTICES = {
   "gh-error": (s) => ({ icon: "board", title: "Couldn't read the repo's boards", detail: s.message }),
 };
 
-// The linked boards of a repo, as a screen state.
+// [icon, colour, label] for an item's kind and state, as GitHub draws them (from the epic #1 prototype).
+function stateIcon(row, t) {
+  if (row.type === "DraftIssue") return ["draft", t.dim, "Draft issue"];
+  if (row.type === "PullRequest") {
+    if (row.state === "MERGED") return ["pull-request-merged", t.ansi5, "Merged"];
+    if (row.state === "CLOSED") return ["pull-request-closed", t.ansi1, "Closed"];
+    return row.isDraft ? ["pull-request-draft", t.dim, "Draft pull request"] : ["pull-request", t.ansi2, "Open"];
+  }
+  if (row.state === "CLOSED")
+    return row.stateReason === "NOT_PLANNED"
+      ? ["issue-skipped", t.dim, "Closed as not planned"]
+      : ["issue-closed", t.ansi5, "Closed"];
+  return ["issue-open", t.ansi2, "Open"];
+}
+
+// Two lines: state icon, title and #number, then the Status pill and sub-issue progress.
+function Row(row) {
+  const t = theme();
+  const [icon, color, label] = stateIcon(row, t);
+  const percent = progress(row.summary);
+  return v_flex()
+    .id(`row-${row.key}`)
+    .flex_none()
+    .px(4)
+    .py(5)
+    .gap(3)
+    .child(
+      h_flex()
+        .gap(6)
+        .items_center()
+        .child(Icon(icon, 15).text_color(color).accessibility_label(label))
+        .child(div().flex_1().min_w(0).truncate().child(row.title))
+        .when(row.number != null, (el) => el.child(IssueNumber(row.number))),
+    )
+    .when(Boolean(row.status) || percent !== null, (el) =>
+      el.child(
+        h_flex()
+          .pl(21)
+          .min_w(0)
+          .overflow_hidden()
+          .gap(10)
+          .items_center()
+          .when(Boolean(row.status), (line) => line.child(StatusPill(row.status)))
+          .when(percent !== null, (line) => line.child(Progress(percent))),
+      ),
+    );
+}
+
+// The linked boards of a repo, and the one board's items, as a screen state.
 async function findBoard(repo) {
-  let pick;
   try {
-    pick = pickProject(await loadProjects(repo));
+    const pick = pickProject(await loadProjects(repo));
+    if (pick.kind === "none") return { kind: "no-board", repo };
+    if (pick.kind === "many") return { kind: "many-boards", repo, names: pick.names };
+    return { kind: "board", repo, title: pick.project.title, rows: parseItems(await loadItems(pick.project.id)) };
   } catch (e) {
     return { kind: "gh-error", repo, message: e.message };
   }
-  if (pick.kind === "none") return { kind: "no-board", repo };
-  if (pick.kind === "many") return { kind: "many-boards", repo, names: pick.names };
-  return { kind: "board", repo, title: pick.project.title };
 }
 
 export default class ProjectBoard extends View {
@@ -93,6 +141,9 @@ export default class ProjectBoard extends View {
     const notice = NOTICES[s.kind]?.(s);
     return Panel("project-board")
       .child(Header({ title: s.kind === "board" ? s.title : "Project Board", subtitle: s.repo ?? s.folder }))
-      .when(Boolean(notice), (el) => el.child(Notice({ id: s.kind, ...notice })));
+      .when(Boolean(notice), (el) => el.child(Notice({ id: s.kind, ...notice })))
+      .when(s.kind === "board", (el) =>
+        el.child(v_flex().id("board-list").flex_1().min_h(0).overflow_y_scrollbar().px(6).py(4).children(s.rows.map(Row))),
+      );
   }
 }

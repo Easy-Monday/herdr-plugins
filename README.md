@@ -2,7 +2,7 @@
 
 A read-only side panel for [Herdr Desktop](https://github.com/herdrdev/herdr-app) that shows the GitHub project board linked to the repo of your active tab. Follow epics, stories and their sub-issues while agents work, without keeping a browser open beside Herdr. It works with GitHub through the `gh` CLI.
 
-> **Status:** in development. The first release will be tagged `v0.1.0`; until then `main` works but may be incomplete.
+> **Status:** in development and not usable yet. The list below is the scope of the first release, `v0.1.0`.
 
 ## What it shows
 
@@ -10,7 +10,7 @@ A read-only side panel for [Herdr Desktop](https://github.com/herdrdev/herdr-app
 - **Board list:** top-level items in the board's order with their state, `#number`, Status pill and sub-issue progress.
 - **Sub-issues** nest under their parent, at any depth.
 - **Done hidden by default**, with a **Show done** toggle.
-- **Issue detail** *(coming in v0.1.0)*: body, sub-issues, comments and Status changes in one timeline, with agent handoff comments highlighted.
+- **Issue detail:** body, sub-issues, comments and Status changes in one timeline, with agent handoff comments highlighted.
 - **Keeps current:** refreshes every 60 seconds (a setting) and on the refresh button, keeping your place.
 
 It never changes anything on GitHub or in git: GraphQL queries only, and read-only git commands.
@@ -39,7 +39,7 @@ scripts/install.sh            # copies mod/ to ~/.config/herdr-app/mods/project-
 herdr-app check ~/.config/herdr-app/mods/project-board
 ```
 
-`scripts/install.sh` needs only `sh` and `tar`. It doesn't edit layouts or keys. Run it again after pulling a new version. `HERDR_APP_HOME` installs into another Herdr home.
+`scripts/install.sh` needs only standard Unix tools (`sh`, `tar`, `find`, `cp`). It doesn't edit layouts or keys. Run it again after pulling a new version. `HERDR_APP_HOME` installs into another Herdr home.
 
 </details>
 
@@ -51,14 +51,14 @@ The mod ships with `place: none`, so installing it changes no layout. Add it to 
 { "id": "project-board", "type": "block", "content": { "mod": "project-board" } }
 ```
 
-To open it from the tab bar, add a button that selects that block, in a tab bar you own (clone it with `mod.clone`). In a clone of the default `tabs` mod, the button's click runs:
+To open it from the tab bar, add a button that selects that block, in a tab bar you own: clone it with `herdr-app do mod.clone '{"name":"tabs","as":"my-tabs"}'` and point your layout's tab bar block at `my-tabs`. In that clone, the button's click runs:
 
 ```js
 run("layout.select", { stack: "panel-body", child: "project-board" });
 run("layout.show", { id: "panel" });
 ```
 
-With [Better Tabs](https://github.com/munza/herdr-mods/tree/main/better-tabs), a button entry does the same:
+With [Better Tabs](https://github.com/munza/herdr-mods/tree/main/better-tabs), a button entry does the same (a `buttons` list replaces its default buttons, so list Files and Changes too if you want them):
 
 ```json
 {

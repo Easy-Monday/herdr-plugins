@@ -2,6 +2,16 @@ Herdr Project Board
 Copyright 2026 Easy-Monday
 
 This product includes repository-detection code adapted from Branch PR
-(https://github.com/munza/herdr-mods/tree/main/branch-pr), part of Herdr Mods,
-Copyright 2026 Tawsif Aqib, licensed under the Apache License, Version 2.0.
-Files that contain adapted code say so in a header comment.
+(https://github.com/munza/herdr-mods/tree/main/branch-pr), licensed under the
+Apache License, Version 2.0. Files that contain adapted code say so in a header
+comment. The attribution notices from that project's NOTICE that pertain to
+Branch PR follow, verbatim:
+
+  Herdr Mods — Better Changes, Better Files, Better Sidebar, Better Tabs, Branch PR,
+  and Branch Issue
+  Copyright 2026 Tawsif Aqib
+
+  Branch PR extracts the pull-request integration originally developed in
+  herdr-workflow by Tawsif Aqib, including its native UI, GitHub CLI Go bridge,
+  agent actions, and tests. Its bundled UI SVG icons are adapted from Herdr
+  Desktop's icon set.

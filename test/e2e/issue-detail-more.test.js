@@ -20,7 +20,9 @@ function world(s, nodes, answerIssue = () => fail(1, "no issue")) {
       const asked = args.join(" ");
       if (/projectsV2/.test(asked))
         return ok(JSON.stringify({ data: { repository: { projectsV2: { nodes: [project], pageInfo: { hasNextPage: false, endCursor: null } } } } }));
-      if (args.includes(`id=${project.id}`)) return ok(JSON.stringify(itemsPage(nodes)));
+      // Like GitHub, the item id comes back only when the query asks for it.
+      const fields = (n) => { const { fullDatabaseId, ...rest } = n; return /\bfullDatabaseId\b/.test(asked) ? n : rest; };
+      if (args.includes(`id=${project.id}`)) return ok(JSON.stringify(itemsPage(nodes.map(fields))));
       const nodeId = args.find((a) => a.startsWith("id="))?.slice(3);
       return answerIssue(nodeId);
     }
@@ -60,7 +62,7 @@ async function click(render, match) {
 test("a draft issue row offers only Open on GitHub, opening its board item", async () => {
   const s = id();
   const title = `Idea ${s}`;
-  const project = world(s, [{ ...draftIssue({ id: `DI_${s}`, title }), databaseId: 77 }, issue({ id: `I_3${s}`, number: 3, title: `Other ${s}` })]);
+  const project = world(s, [{ ...draftIssue({ id: `DI_${s}`, title }), fullDatabaseId: "77" }, issue({ id: `I_3${s}`, number: 3, title: `Other ${s}` })]);
   const render = await open();
   await click(render, (n) => text(n).includes(title));
 

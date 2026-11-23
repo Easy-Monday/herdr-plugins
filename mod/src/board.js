@@ -21,7 +21,7 @@ export function parseItems(pages) {
         title: c.title,
         url: c.url ?? null,
         // The board item's number: a draft issue has no page of its own, only the board's item pane.
-        itemId: n.databaseId ?? null,
+        itemId: n.fullDatabaseId ?? null,
         state: c.state ?? "OPEN",
         stateReason: c.stateReason ?? null,
         isDraft: Boolean(c.isDraft),

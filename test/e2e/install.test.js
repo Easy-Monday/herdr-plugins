@@ -29,4 +29,5 @@ test("should install the prototype copy with the mock layer", () => {
   const dest = install(home, "prototype");
   assert.equal(dest, join(home, "mods/project-board-prototype"));
   assert.match(readFileSync(join(dest, "src/mock.js"), "utf8"), /export function mock/);
+  assert.match(readFileSync(join(dest, "src/name.js"), "utf8"), /"project-board-prototype"/);
 });

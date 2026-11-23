@@ -2,7 +2,10 @@
 import { herdrStub } from "herdr";
 export { herdrStub };
 
-const cx = new Proxy({}, { get: (_, key) => (key === "focus_handle" ? () => ({ focus() {} }) : () => {}) });
+const timer = { every() {}, after() {} };
+const cx = new Proxy({}, {
+  get: (_, key) => (key === "timer" ? timer : key === "focus_handle" ? () => ({ focus() {} }) : () => {}),
+});
 
 export async function mount(props = {}) {
   herdrStub.props = props;
@@ -15,13 +18,13 @@ export async function mount(props = {}) {
 export function walk(node, visit) {
   if (node == null || typeof node !== "object") return;
   visit(node);
-  for (const child of node.children ?? []) walk(child, visit);
+  for (const child of node.kids ?? []) walk(child, visit);
 }
 
 export function text(node) {
   if (node == null) return "";
   if (typeof node !== "object") return String(node);
-  return (node.children ?? []).map(text).join(" ");
+  return (node.kids ?? []).map(text).join(" ");
 }
 
 export function byId(tree, id) {

@@ -1,6 +1,6 @@
 // Project Board: a read-only panel showing the GitHub project board of the active tab's repo.
 import { View, div } from "gpui-kit";
-import { v_flex, h_flex } from "gpui-base";
+import { v_flex, h_flex, ScrollHandle } from "gpui-base";
 import { theme, spaces, panes, checking, props } from "herdr";
 import { mock } from "./src/mock.js";
 import { detectRepo } from "./src/git.js";
@@ -74,7 +74,10 @@ export default class ProjectBoard extends View {
   init(_props, cx) {
     const given = props() ?? {};
     this.lastFolder = new Map();
-    this.expanded = new Set();
+    // Per repo: its expanded rows, scroll position and last board, kept while the panel
+    // shows another board or is hidden (#8 AC-4). A hidden copy isn't drawn, so the list's
+    // own scroll state is dropped; a ScrollHandle kept on the view holds it.
+    this.boards = new Map();
     // Prototype only: open in a given state, e.g. props {"scenario": "big", "expand": ["I_1"]}.
     if (mock?.scenarios && given.scenario) mock.choose(given.scenario);
     this.startExpanded = mock?.scenarios ? (given.expand ?? []) : [];
@@ -98,9 +101,14 @@ export default class ProjectBoard extends View {
     if (key === this.key) return;
     this.key = key;
     this.sp = sp;
-    this.screen = { kind: "loading" };
-    this.expanded = new Set(this.startExpanded);
     this.load(cx);
+  }
+
+  // Not callable from render: Herdr makes scroll handles only outside it.
+  board(repo) {
+    if (!this.boards.has(repo))
+      this.boards.set(repo, { expanded: new Set(this.startExpanded), scroll: ScrollHandle.new(), screen: null });
+    return this.boards.get(repo);
   }
 
   load(cx) {
@@ -116,6 +124,11 @@ export default class ProjectBoard extends View {
         if (found.kind !== "repo") screen = found;
         else {
           repo = found.repo;
+          // A switch to another board shows it as it was left; the load below refreshes it.
+          if (token === this.token && this.screen.repo !== repo) {
+            this.screen = this.board(repo).screen ?? { kind: "loading", repo };
+            cx.notify();
+          }
           const pick = pickProject(await loadProjects(repo));
           if (pick.kind === "none") screen = { kind: "no-board", repo };
           else if (pick.kind === "many") screen = { kind: "many-boards", repo, names: pick.names };
@@ -129,13 +142,15 @@ export default class ProjectBoard extends View {
       }
       if (token !== this.token) return;
       this.screen = { ...screen, folder: sp?.folder ?? null };
+      if (screen.kind === "board") this.board(repo).screen = this.screen;
       this.loading = false;
       cx.notify();
     });
   }
 
   toggle(key, cx) {
-    if (!this.expanded.delete(key)) this.expanded.add(key);
+    const { expanded } = this.board(this.screen.repo);
+    if (!expanded.delete(key)) expanded.add(key);
     cx.notify();
   }
 
@@ -258,7 +273,8 @@ export default class ProjectBoard extends View {
   }
 
   list(s) {
-    const rows = visibleRows(s.tree, { showDone: this.showDone, expanded: this.expanded });
+    const { expanded, scroll } = this.boards.get(s.repo);
+    const rows = visibleRows(s.tree, { showDone: this.showDone, expanded });
     if (!rows.length)
       return Notice({
         id: "board-empty",
@@ -271,13 +287,14 @@ export default class ProjectBoard extends View {
       .flex_1()
       .min_h(0)
       .overflow_y_scrollbar()
+      .track_scroll(scroll)
       .px(6)
       .py(4)
-      .children(rows.map((row) => this.row(row)));
+      .children(rows.map((row) => this.row(row, expanded)));
   }
 
   // Top level: title line, then Status and progress under it. Sub-issues: one line, Status last.
-  row({ node, depth }) {
+  row({ node, depth }, expanded) {
     const t = theme();
     const [icon, color, label] = stateIcon(node, t);
     const titleLine = h_flex()
@@ -286,7 +303,7 @@ export default class ProjectBoard extends View {
       .child(
         Chevron({
           id: `chevron-${node.key}`,
-          open: this.expanded.has(node.key),
+          open: expanded.has(node.key),
           onClick: node.children.length ? (cx) => this.toggle(node.key, cx) : null,
         }),
       )
@@ -369,7 +386,8 @@ export default class ProjectBoard extends View {
                   onClick: (cx) => {
                     mock.choose(s.id);
                     this.screen = { kind: "loading" };
-                    this.expanded.clear();
+                    // shortcut: drops the old handles unreleased (a few per click); prototype only.
+                    this.boards.clear();
                     this.load(cx);
                   },
                 }),

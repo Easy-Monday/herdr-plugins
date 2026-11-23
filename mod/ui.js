@@ -3,7 +3,7 @@
 // views/ui.js. Changed: TEXT keeps three of its sizes, Icon takes the folder from the
 // installed mod name, and Panel takes the id directly and has no rounded border.
 import { div, svg } from "gpui-kit";
-import { h_flex, v_flex } from "gpui-base";
+import { h_flex, v_flex, TextView } from "gpui-base";
 import { theme, settings } from "herdr";
 import { MOD } from "./src/name.js";
 import { statusColor } from "./src/status.js";
@@ -142,7 +142,10 @@ export function Chevron({ id, open, onClick }) {
     .cursor_pointer()
     .accessibility_label(open ? "Collapse sub-issues" : "Expand sub-issues")
     .hover((s) => s.bg(t.hover).text_color(t.foreground))
-    .on_click((_e, cx) => onClick(cx))
+    .on_click((_e, cx) => {
+      cx.stop_propagation(); // the row around it opens the issue
+      onClick(cx);
+    })
     .child(Icon(open ? "chevron-down" : "chevron-right", 12));
 }
 
@@ -170,10 +173,10 @@ export function Button({ id, label, primary = false, onClick }) {
 }
 
 // The load in progress: an icon spinning natively (no timer), labelled for screen readers.
-export function Busy(label) {
+export function Busy(label, id = "board-loading") {
   const t = theme();
   return v_flex()
-    .id("board-loading")
+    .id(id)
     .flex_1()
     .min_h(0)
     .gap(10)
@@ -215,3 +218,34 @@ export function Notice({ id, icon, title, detail, list, command, buttons = [] })
     )
     .when(buttons.length > 0, (el) => el.child(h_flex().gap(8).children(buttons)));
 }
+
+// Markdown, TypeTag and Message follow the approved epic #10 prototype (epic/10-prototype, a28afdf).
+// Issue markdown; its links open in the system browser.
+export const Markdown = (id, text) =>
+  TextView.markdown(id, text)
+    .text_size(TEXT.body)
+    .w_full()
+    .min_w(0)
+    .scrollable(false)
+    .selectable(true)
+    .on_link_click((url, cx) => cx.open_url(url));
+
+// The GitHub issue type (Epic, Feature, Bug …), outlined so it reads apart from the Status pill.
+export function TypeTag(name) {
+  const t = theme();
+  return div()
+    .flex_none()
+    .h(18)
+    .px(6)
+    .flex()
+    .items_center()
+    .rounded(4)
+    .border_1()
+    .border_color(t.border)
+    .text_size(TEXT.caption)
+    .text_color(t.muted)
+    .child(name);
+}
+
+export const Message = (text) =>
+  div().flex_none().text_size(TEXT.small).text_color(theme().dim).whitespace_normal().child(text);

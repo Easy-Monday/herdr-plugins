@@ -19,6 +19,9 @@ export function parseItems(pages) {
         type: c.__typename,
         number: c.number ?? null,
         title: c.title,
+        url: c.url ?? null,
+        // The board item's number: a draft issue has no page of its own, only the board's item pane.
+        itemId: n.databaseId ?? null,
         state: c.state ?? "OPEN",
         stateReason: c.stateReason ?? null,
         isDraft: Boolean(c.isDraft),
@@ -41,6 +44,7 @@ export function buildTree(items) {
     type: "Issue",
     number: s.number,
     title: s.title,
+    url: s.url ?? null,
     state: s.state ?? "OPEN",
     stateReason: s.stateReason ?? null,
     isDraft: false,

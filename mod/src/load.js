@@ -3,9 +3,8 @@ import { gh } from "./gh.js";
 
 const PROJECTS = `query($owner:String!,$name:String!,$after:String){repository(owner:$owner,name:$name){projectsV2(first:100,after:$after){nodes{id number title closed}pageInfo{hasNextPage endCursor}}}}`;
 // The epic #1 prototype's items query (epic/1-prototype, cac901d).
-// shortcut: an issue's first 50 sub-issues only; page `subIssues` when a board needs more.
 const SUB = `id number title state stateReason subIssuesSummary{total completed percentCompleted}`;
-const ITEMS = `query($id:ID!,$after:String){node(id:$id){... on ProjectV2{items(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{id status:fieldValueByName(name:"Status"){... on ProjectV2ItemFieldSingleSelectValue{name color}} content{__typename ... on Issue{${SUB} subIssues(first:50){nodes{${SUB}}}} ... on PullRequest{id number title state isDraft} ... on DraftIssue{id title}}}}}}}`;
+const ITEMS = `query($id:ID!,$after:String){node(id:$id){... on ProjectV2{items(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{id status:fieldValueByName(name:"Status"){... on ProjectV2ItemFieldSingleSelectValue{name color}} content{__typename ... on Issue{${SUB} subIssues(first:100){nodes{${SUB}}}} ... on PullRequest{id number title state isDraft} ... on DraftIssue{id title}}}}}}}`;
 
 async function graphql(query, vars) {
   const args = ["api", "graphql", "-f", `query=${query}`];

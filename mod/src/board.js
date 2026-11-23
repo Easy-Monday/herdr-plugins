@@ -29,5 +29,37 @@ export function parseItems(pages) {
     });
 }
 
+// Rows as a tree: each row plus `children`, its sub-issues at any depth. A sub-issue on the board
+// is its board row (Status, own sub-issues); one off the board has no Status and no children.
+// Board items that are another item's sub-issue show only under it.
+export function buildTree(items) {
+  const byKey = new Map(items.map((i) => [i.key, i]));
+  const nested = new Set(items.flatMap((i) => i.subIssues.map((s) => s.id)));
+  const offBoard = (s) => ({
+    key: s.id,
+    type: "Issue",
+    number: s.number,
+    title: s.title,
+    state: s.state ?? "OPEN",
+    stateReason: s.stateReason ?? null,
+    isDraft: false,
+    status: null,
+    summary: s.subIssuesSummary ?? null,
+    subIssues: [],
+  });
+  const seen = new Set();
+  // `path` holds the ancestors: a sub-issue pointing back up is left out, so a loop can't recurse forever.
+  const node = (item, above) => {
+    seen.add(item.key);
+    const path = new Set(above).add(item.key);
+    const kids = item.subIssues.filter((s) => !path.has(s.id));
+    return { ...item, children: kids.map((s) => node(byKey.get(s.id) ?? offBoard(s), path)) };
+  };
+  const tree = items.filter((i) => !nested.has(i.key)).map((i) => node(i, []));
+  // Items in a loop have no top item; show them at top level rather than lose them.
+  for (const i of items) if (!seen.has(i.key)) tree.push(node(i, []));
+  return tree;
+}
+
 // Closed over all sub-issues, in whole percent; null without sub-issues.
 export const progress = (summary) => (summary?.total ? Math.round((summary.completed / summary.total) * 100) : null);

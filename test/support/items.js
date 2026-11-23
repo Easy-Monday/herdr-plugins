@@ -5,10 +5,22 @@
 
 const NO_SUB_ISSUES = { total: 0, completed: 0, percentCompleted: 0 };
 
-export const issue = ({ id, number, title, state = "OPEN", stateReason = null, status = null, summary = NO_SUB_ISSUES }) => ({
+// `subIssues`: the issue's sub-issues as `subIssue(...)` nodes (story #6), none by default.
+export const issue = ({ id, number, title, state = "OPEN", stateReason = null, status = null, summary = NO_SUB_ISSUES, subIssues = [] }) => ({
   id: `PVTI_${id}`,
   status,
-  content: { __typename: "Issue", id, number, title, state, stateReason, subIssuesSummary: summary, subIssues: { nodes: [] } },
+  content: { __typename: "Issue", id, number, title, state, stateReason, subIssuesSummary: summary, subIssues: { nodes: subIssues } },
+});
+
+// One node of an issue's `subIssues` list, in the prototype's shape (cac901d, mod/src/load.js `SUB`):
+// the sub-issue itself, with no Status (a board field) and no sub-issue list of its own.
+export const subIssue = ({ id, number, title, state = "OPEN", stateReason = null, summary = NO_SUB_ISSUES }) => ({
+  id,
+  number,
+  title,
+  state,
+  stateReason,
+  subIssuesSummary: summary,
 });
 
 export const pullRequest = ({ id, number, title, state = "OPEN", isDraft = false, status = null }) => ({

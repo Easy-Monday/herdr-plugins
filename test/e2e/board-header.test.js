@@ -41,11 +41,12 @@ test("should show the one open linked board's name in the header with owner/repo
   assert.doesNotMatch(screen, /No project board|Only one linked board/);
 });
 
-test("should say the boards couldn't be read, with gh's message, when gh fails", async () => {
+test("should say the board didn't load, with gh's message, when gh fails", async () => {
   const s = randomUUID().slice(0, 8);
   world(`/w/${s}`, `own-${s}/web-${s}`, { code: 1, stdout: "", stderr: `boom ${s}` });
   const screen = await shown();
-  assert.match(screen, new RegExp(`Couldn't read the repo's boards boom ${s}`));
+  // Story #4 replaced the interim "Couldn't read the repo's boards" with the prototype's API-error notice.
+  assert.match(screen, new RegExp(`The board didn't load boom ${s}`));
 });
 
 const boards = (nodes, pageInfo) => ok(JSON.stringify({ data: { repository: { projectsV2: { nodes, pageInfo } } } }));

@@ -5,8 +5,9 @@ import { theme, spaces, panes, checking } from "herdr";
 import { activeSpace } from "./src/repo.js";
 import { detectRepo } from "./src/git.js";
 import { loadProjects, loadItems } from "./src/load.js";
-import { pickProject, parseItems, progress } from "./src/board.js";
-import { Panel, Header, Notice, Icon, IssueNumber, StatusPill, Progress } from "./ui.js";
+import { pickProject, parseItems, buildTree, progress } from "./src/board.js";
+import { classifyError } from "./src/errors.js";
+import { Panel, Header, Notice, Busy, Button, Icon, IssueNumber, StatusPill, Progress, Chevron } from "./ui.js";
 
 const CONTEXT_POLL_MS = 1000;
 
@@ -32,9 +33,37 @@ const NOTICES = {
     detail: `${s.repo} has ${s.names.length} open boards linked:`,
     list: s.names,
   }),
-  "git-error": (s) => ({ icon: "folder", title: "Couldn't read this folder", detail: s.message }),
-  // shortcut: one generic gh message; story #4 tells gh missing, signed out and offline apart.
-  "gh-error": (s) => ({ icon: "board", title: "Couldn't read the repo's boards", detail: s.message }),
+  "git-error": (s, tryAgain) => ({
+    icon: "folder",
+    title: "Couldn't read this folder",
+    detail: s.message,
+    buttons: [tryAgain],
+  }),
+  // The gh errors classifyError tells apart, worded as in the approved epic #1 prototype (cac901d).
+  "gh-missing": (_s, tryAgain) => ({
+    icon: "terminal",
+    title: "The GitHub CLI is needed",
+    detail: "The panel reads the board through gh. Install it, log in, then try again.",
+    buttons: [
+      Button({ id: "get-gh", label: "Get GitHub CLI", onClick: (cx) => cx.open_url("https://cli.github.com") }),
+      tryAgain,
+    ],
+  }),
+  "gh-logged-out": (_s, tryAgain) => ({
+    icon: "terminal",
+    title: "gh isn't logged in",
+    detail: "The panel reads the board through gh. Log in with the project scope in a terminal, then try again.",
+    command: "gh auth login -s project",
+    buttons: [tryAgain],
+  }),
+  "gh-scope": (_s, tryAgain) => ({
+    icon: "terminal",
+    title: "gh can't read project boards",
+    detail: "gh is logged in, but its login lacks the project scope. Add it in a terminal, then try again.",
+    command: "gh auth refresh -s project",
+    buttons: [tryAgain],
+  }),
+  "api-error": (s, tryAgain) => ({ icon: "alert", title: "The board didn't load", detail: s.message, buttons: [tryAgain] }),
 };
 
 // [icon, colour, label] for an item's kind and state, as GitHub draws them (from the epic #1 prototype).
@@ -52,38 +81,57 @@ function stateIcon(row, t) {
   return ["issue-open", t.ansi2, "Open"];
 }
 
-// Two lines: state icon, title and #number, then the Status pill and sub-issue progress.
-function Row(row) {
+// Top level: chevron, state icon, title and #number, then the Status pill and sub-issue progress.
+// Sub-issues: one line, indented per level, Status last.
+function Row({ node, depth }, open, onToggle) {
   const t = theme();
-  const [icon, color, label] = stateIcon(row, t);
-  const percent = progress(row.summary);
+  const [icon, color, label] = stateIcon(node, t);
+  const titleLine = h_flex()
+    .gap(6)
+    .items_center()
+    .child(Chevron({ id: `chevron-${node.key}`, open, onClick: node.children.length ? onToggle : null }))
+    .child(Icon(icon, 15).text_color(color).accessibility_label(label))
+    .child(div().flex_1().min_w(0).truncate().child(node.title))
+    .when(node.number != null, (el) => el.child(IssueNumber(node.number)));
+  if (depth)
+    return h_flex()
+      .id(`row-${node.key}`)
+      .flex_none()
+      .h(28)
+      .pl(depth * 20)
+      .pr(4)
+      .gap(6)
+      .items_center()
+      .child(titleLine.flex_1().min_w(0))
+      .when(Boolean(node.status), (el) => el.child(StatusPill(node.status)));
+  const percent = progress(node.summary);
   return v_flex()
-    .id(`row-${row.key}`)
+    .id(`row-${node.key}`)
     .flex_none()
     .px(4)
     .py(5)
     .gap(3)
-    .child(
-      h_flex()
-        .gap(6)
-        .items_center()
-        .child(Icon(icon, 15).text_color(color).accessibility_label(label))
-        .child(div().flex_1().min_w(0).truncate().child(row.title))
-        .when(row.number != null, (el) => el.child(IssueNumber(row.number))),
-    )
-    .when(Boolean(row.status) || percent !== null, (el) =>
+    .child(titleLine)
+    .when(Boolean(node.status) || percent !== null, (el) =>
       el.child(
         h_flex()
-          .pl(21)
+          .pl(45)
           .min_w(0)
           .overflow_hidden()
           .gap(10)
           .items_center()
-          .when(Boolean(row.status), (line) => line.child(StatusPill(row.status)))
+          .when(Boolean(node.status), (line) => line.child(StatusPill(node.status)))
           .when(percent !== null, (line) => line.child(Progress(percent))),
       ),
     );
 }
+
+// The rows on screen: every top-level item, and the children of expanded rows, depth first.
+const shown = (nodes, expanded, depth = 0) =>
+  nodes.flatMap((node) => [
+    { node, depth },
+    ...(expanded.has(node.key) ? shown(node.children, expanded, depth + 1) : []),
+  ]);
 
 // The linked boards of a repo, and the one board's items, as a screen state.
 async function findBoard(repo) {
@@ -91,15 +139,18 @@ async function findBoard(repo) {
     const pick = pickProject(await loadProjects(repo));
     if (pick.kind === "none") return { kind: "no-board", repo };
     if (pick.kind === "many") return { kind: "many-boards", repo, names: pick.names };
-    return { kind: "board", repo, title: pick.project.title, rows: parseItems(await loadItems(pick.project.id)) };
+    return { kind: "board", repo, title: pick.project.title, tree: buildTree(parseItems(await loadItems(pick.project.id))) };
   } catch (e) {
-    return { kind: "gh-error", repo, message: e.message };
+    // Boards and items alike: gh missing, logged out, missing scope, or any other API error.
+    return { kind: classifyError(e), repo, message: e.message };
   }
 }
 
 export default class ProjectBoard extends View {
   init(_props, cx) {
     this.lastFolder = new Map();
+    // Keys of the expanded rows. shortcut: one set for every board; story #8 keeps it per board.
+    this.expanded = new Set();
     this.screen = { kind: "loading" };
     this.token = 0;
     if (checking()) return;
@@ -113,6 +164,20 @@ export default class ProjectBoard extends View {
     const key = sp ? `${sp.machine ?? "local"}:${sp.folder}` : "";
     if (key === this.key) return;
     this.key = key;
+    this.sp = sp;
+    this.load(cx);
+  }
+
+  // Try again: the same folder's load once more, showing the loading indicator meanwhile.
+  retry(cx) {
+    const { repo, folder } = this.screen;
+    this.screen = { kind: "loading", repo, folder };
+    cx.notify();
+    this.load(cx);
+  }
+
+  load(cx) {
+    const sp = this.sp;
     const token = ++this.token;
     cx.spawn(async (cx) => {
       let screen;
@@ -136,14 +201,34 @@ export default class ProjectBoard extends View {
     });
   }
 
+  toggle(key, cx) {
+    if (!this.expanded.delete(key)) this.expanded.add(key);
+    cx.notify();
+  }
+
   render() {
     const s = this.screen;
-    const notice = NOTICES[s.kind]?.(s);
+    const tryAgain = Button({ id: "try-again", label: "Try again", primary: true, onClick: (cx) => this.retry(cx) });
+    const notice = NOTICES[s.kind]?.(s, tryAgain);
     return Panel("project-board")
       .child(Header({ title: s.kind === "board" ? s.title : "Project Board", subtitle: s.repo ?? s.folder }))
+      .when(s.kind === "loading", (el) => el.child(Busy("Loading the board…")))
       .when(Boolean(notice), (el) => el.child(Notice({ id: s.kind, ...notice })))
       .when(s.kind === "board", (el) =>
-        el.child(v_flex().id("board-list").flex_1().min_h(0).overflow_y_scrollbar().px(6).py(4).children(s.rows.map(Row))),
+        el.child(
+          v_flex()
+            .id("board-list")
+            .flex_1()
+            .min_h(0)
+            .overflow_y_scrollbar()
+            .px(6)
+            .py(4)
+            .children(
+              shown(s.tree, this.expanded).map((row) =>
+                Row(row, this.expanded.has(row.node.key), (cx) => this.toggle(row.node.key, cx)),
+              ),
+            ),
+        ),
       );
   }
 }

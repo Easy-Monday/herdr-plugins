@@ -9,6 +9,7 @@ import { MOD } from "./src/name.js";
 import { statusColor } from "./src/status.js";
 
 export const TEXT = { caption: 11, small: 12, body: 13 };
+const SPIN_MS = 900;
 
 // A theme colour at low strength, for a pill's fill.
 const tint = (color) => (/^#[0-9a-f]{6}/i.test(color) ? `${color.slice(0, 7)}24` : color);
@@ -104,8 +105,44 @@ export function Chevron({ id, open, onClick }) {
 export const IssueNumber = (n) =>
   div().flex_none().text_size(TEXT.caption).text_color(theme().dim).font_family(codeFont()).child(`#${n}`);
 
-// A whole-panel message: an icon, what happened, what to do, then a list of names.
-export function Notice({ id, icon, title, detail, list }) {
+// Button, Notice's command and buttons, and Busy follow the approved epic #1 prototype (cac901d).
+export function Button({ id, label, primary = false, onClick }) {
+  const t = theme();
+  return h_flex()
+    .id(id)
+    .h(30)
+    .flex_none()
+    .px(14)
+    .items_center()
+    .justify_center()
+    .rounded(8)
+    .text_size(TEXT.small)
+    .bg(primary ? t.solid : t.raised)
+    .text_color(primary ? t.solid_foreground : t.foreground)
+    .cursor_pointer()
+    .hover((s) => (primary ? s.opacity(0.88) : s.bg(t.hover)))
+    .on_click((_e, cx) => onClick(cx))
+    .child(label);
+}
+
+// The load in progress: an icon spinning natively (no timer), labelled for screen readers.
+export function Busy(label) {
+  const t = theme();
+  return v_flex()
+    .id("board-loading")
+    .flex_1()
+    .min_h(0)
+    .gap(10)
+    .items_center()
+    .justify_center()
+    .text_size(TEXT.small)
+    .text_color(t.dim)
+    .child(Icon("refresh", 20).spin(SPIN_MS).accessibility_label("Loading"))
+    .child(label);
+}
+
+// A whole-panel message: an icon, what happened, what to do, then a list of names, a command or buttons.
+export function Notice({ id, icon, title, detail, list, command, buttons = [] }) {
   const t = theme();
   return v_flex()
     .id(id)
@@ -126,5 +163,11 @@ export function Notice({ id, icon, title, detail, list }) {
           .gap(4)
           .children(list.map((name) => div().text_size(TEXT.small).text_color(t.foreground).child(name))),
       ),
-    );
+    )
+    .when(Boolean(command), (el) =>
+      el.child(
+        div().p(8).rounded(6).bg(t.canvas).text_size(TEXT.small).font_family(codeFont()).text_color(t.muted).child(command),
+      ),
+    )
+    .when(buttons.length > 0, (el) => el.child(h_flex().gap(8).children(buttons)));
 }

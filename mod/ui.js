@@ -54,6 +54,26 @@ export function Header({ title, subtitle, actions = [] }) {
     .children(actions);
 }
 
+// A header icon action, labelled for screen readers; its icon spins natively while `spinning` (prototype cac901d).
+export function IconButton({ id, icon, label, onClick, spinning = false }) {
+  const t = theme();
+  return div()
+    .id(id)
+    .size(26)
+    .flex_none()
+    .flex()
+    .items_center()
+    .justify_center()
+    .rounded(6)
+    .text_color(t.dim)
+    .accessibility_label(label)
+    .tooltip(label)
+    .cursor_pointer()
+    .hover((s) => s.bg(t.hover).text_color(t.foreground))
+    .on_click((_e, cx) => onClick(cx))
+    .child(spinning ? Icon(icon, 15).spin(SPIN_MS) : Icon(icon, 15));
+}
+
 // A small labelled toggle, from the approved epic #1 prototype (cac901d).
 export function TextButton({ id, icon, label, active = false, onClick }) {
   const t = theme();

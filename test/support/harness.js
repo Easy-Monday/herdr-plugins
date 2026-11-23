@@ -2,9 +2,12 @@
 import { herdrStub } from "herdr";
 export { herdrStub };
 
-// cx.timer.every/after calls of the last mounted view, newest last: { ms, fn }. tick() fires them.
+// cx.timer.every/after calls of the last mounted view, newest last: { ms, fn, due, repeat }.
+// A fake clock (`now`, ms since mount) decides when each is due; tick() and advance() move it.
 export const timers = [];
-const timer = { every: (ms, fn) => timers.push({ ms, fn }), after: (ms, fn) => timers.push({ ms, fn }) };
+let now = 0;
+const schedule = (ms, fn, repeat) => { timers.push({ ms, fn, due: now + ms, repeat }); };
+const timer = { every: (ms, fn) => schedule(ms, fn, true), after: (ms, fn) => schedule(ms, fn, false) };
 // cx.spawn starts the task; settle() waits for every task started so far, and the ones they start.
 const tasks = [];
 const cx = new Proxy({}, {
@@ -21,15 +24,33 @@ export async function settle() {
   while (tasks.length) await tasks.shift();
 }
 
-// One round of the view's timers (e.g. its focus poll), then every task they started.
+// The earliest timer still to fire, due by `end`.
+const next = (end) => timers.reduce((a, t) => (t.due != null && t.due <= end && (!a || t.due < a.due) ? t : a), null);
+
+// Moves the clock `ms` on: fires each timer as it falls due (an `every` one again each period),
+// waiting after each for the tasks it started.
+export async function advance(ms) {
+  const end = now + ms;
+  for (let t; (t = next(end)); ) {
+    now = t.due;
+    t.due = t.repeat && t.ms > 0 ? t.due + t.ms : null;
+    t.fn(cx);
+    await settle();
+  }
+  now = end;
+}
+
+// Moves the clock to the next moment a timer is due (e.g. the 1 s focus poll) and fires the
+// timers due then, not slower ones (e.g. a board refresh), then every task they started.
 export async function tick() {
-  for (const { fn } of [...timers]) fn(cx);
-  await settle();
+  const due = Math.min(...timers.filter((t) => t.due != null).map((t) => t.due));
+  if (Number.isFinite(due)) await advance(due - now);
 }
 
 export async function mount(props = {}) {
   herdrStub.props = props;
   timers.length = 0;
+  now = 0;
   const { default: Mod } = await import("../../mod/main.js");
   const view = new Mod();
   await view.init?.(props, cx);

@@ -1,13 +1,14 @@
 // Project Board: a read-only panel showing the GitHub project board of the active tab's repo.
 import { View, div } from "gpui-kit";
-import { v_flex, h_flex } from "gpui-base";
-import { theme, spaces, panes, checking } from "herdr";
+import { v_flex, h_flex, ScrollHandle } from "gpui-base";
+import { theme, spaces, panes, checking, props } from "herdr";
 import { activeSpace } from "./src/repo.js";
 import { detectRepo } from "./src/git.js";
 import { loadProjects, loadItems } from "./src/load.js";
 import { pickProject, parseItems, buildTree, visibleRows, progress } from "./src/board.js";
 import { classifyError } from "./src/errors.js";
-import { Panel, Header, Notice, Busy, Button, TextButton, Icon, IssueNumber, StatusPill, Progress, Chevron } from "./ui.js";
+import { refreshSeconds } from "./src/settings.js";
+import { Panel, Header, Notice, Busy, Button, IconButton, TextButton, Icon, IssueNumber, StatusPill, Progress, Chevron } from "./ui.js";
 
 const CONTEXT_POLL_MS = 1000;
 
@@ -156,14 +157,21 @@ async function findBoard(repo) {
 export default class ProjectBoard extends View {
   init(_props, cx) {
     this.lastFolder = new Map();
-    // Keys of the expanded rows. shortcut: one set for every board; story #8 keeps it per board.
-    this.expanded = new Set();
+    // Per repo: its expanded rows, scroll position and last loaded board, kept while the panel
+    // shows another board or is hidden. A hidden copy isn't drawn, so the list's own scroll
+    // state is dropped; a ScrollHandle kept on the view holds it.
+    this.boards = new Map();
     this.showDone = stored("show-done") === "on";
     this.screen = { kind: "loading" };
+    this.loading = true;
     this.token = 0;
     if (checking()) return;
     this.followFocus(cx);
     cx.timer.every(CONTEXT_POLL_MS, (cx) => this.followFocus(cx));
+    // Timers run while hidden too, so this is the only poll of GitHub: never faster than the setting.
+    cx.timer.every(refreshSeconds(props()) * 1000, (cx) => {
+      if (!this.loading) this.load(cx);
+    });
   }
 
   // Switching tab, space or pane, or `cd` in the terminal, re-resolves the repo and its board.
@@ -176,17 +184,18 @@ export default class ProjectBoard extends View {
     this.load(cx);
   }
 
-  // Try again: the same folder's load once more, showing the loading indicator meanwhile.
-  retry(cx) {
-    const { repo, folder } = this.screen;
-    this.screen = { kind: "loading", repo, folder };
-    cx.notify();
-    this.load(cx);
+  // Not callable from render: Herdr makes scroll handles only outside it.
+  board(repo) {
+    if (!this.boards.has(repo)) this.boards.set(repo, { expanded: new Set(), scroll: ScrollHandle.new(), screen: null });
+    return this.boards.get(repo);
   }
 
+  // Reloads in place: the screen (a board, a notice) stays while the header's refresh icon spins.
   load(cx) {
     const sp = this.sp;
     const token = ++this.token;
+    this.loading = true;
+    cx.notify();
     cx.spawn(async (cx) => {
       let screen;
       try {
@@ -196,21 +205,25 @@ export default class ProjectBoard extends View {
         screen = { kind: "git-error", message: e.message };
       }
       if (screen.kind === "repo") {
-        // Show the new repo while gh reads its boards, not the previous repo's board name.
+        // Another repo: its board as it was left, else the repo while gh reads its boards,
+        // never the previous repo's board.
         if (token === this.token && this.screen.repo !== screen.repo) {
-          this.screen = { kind: "loading", repo: screen.repo, folder: sp.folder };
+          this.screen = this.board(screen.repo).screen ?? { kind: "loading", repo: screen.repo, folder: sp.folder };
           cx.notify();
         }
         screen = await findBoard(screen.repo);
       }
       if (token !== this.token) return;
       this.screen = { ...screen, folder: sp?.folder ?? null };
+      if (screen.kind === "board") this.board(screen.repo).screen = this.screen;
+      this.loading = false;
       cx.notify();
     });
   }
 
   toggle(key, cx) {
-    if (!this.expanded.delete(key)) this.expanded.add(key);
+    const { expanded } = this.board(this.screen.repo);
+    if (!expanded.delete(key)) expanded.add(key);
     cx.notify();
   }
 
@@ -222,7 +235,7 @@ export default class ProjectBoard extends View {
 
   render() {
     const s = this.screen;
-    const tryAgain = Button({ id: "try-again", label: "Try again", primary: true, onClick: (cx) => this.retry(cx) });
+    const tryAgain = Button({ id: "try-again", label: "Try again", primary: true, onClick: (cx) => this.load(cx) });
     const notice = NOTICES[s.kind]?.(s, tryAgain);
     const showDone = TextButton({
       id: "show-done",
@@ -236,17 +249,21 @@ export default class ProjectBoard extends View {
         Header({
           title: s.kind === "board" ? s.title : "Project Board",
           subtitle: s.repo ?? s.folder,
-          actions: s.kind === "board" ? [showDone] : [],
+          actions: [
+            ...(s.kind === "board" ? [showDone] : []),
+            IconButton({ id: "refresh", icon: "refresh", label: "Refresh board", spinning: this.loading, onClick: (cx) => this.load(cx) }),
+          ],
         }),
       )
       .when(s.kind === "loading", (el) => el.child(Busy("Loading the board…")))
       .when(Boolean(notice), (el) => el.child(Notice({ id: s.kind, ...notice })))
-      .when(s.kind === "board", (el) => el.child(this.list(s.tree)));
+      .when(s.kind === "board", (el) => el.child(this.list(s)));
   }
 
   // The board's rows, or a notice when none show (wording from the approved epic #1 prototype).
-  list(tree) {
-    const rows = visibleRows(tree, { showDone: this.showDone, expanded: this.expanded });
+  list({ repo, tree }) {
+    const { expanded, scroll } = this.boards.get(repo);
+    const rows = visibleRows(tree, { showDone: this.showDone, expanded });
     if (!rows.length)
       return Notice({
         id: "board-empty",
@@ -259,8 +276,9 @@ export default class ProjectBoard extends View {
       .flex_1()
       .min_h(0)
       .overflow_y_scrollbar()
+      .track_scroll(scroll)
       .px(6)
       .py(4)
-      .children(rows.map((row) => Row(row, this.expanded.has(row.node.key), (cx) => this.toggle(row.node.key, cx))));
+      .children(rows.map((row) => Row(row, expanded.has(row.node.key), (cx) => this.toggle(row.node.key, cx))));
   }
 }

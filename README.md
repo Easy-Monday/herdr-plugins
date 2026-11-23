@@ -11,7 +11,7 @@ A read-only side panel for [Herdr Desktop](https://github.com/herdrdev/herdr-app
 - **Sub-issues** nest under their parent, at any depth.
 - **Done hidden by default**, with a **Show done** toggle.
 - **Issue detail:** body, sub-issues, comments and Status changes in one timeline, with agent handoff comments highlighted.
-- **Keeps current:** refreshes every 60 seconds (a setting) and on the refresh button, keeping your place.
+- **Keeps current:** refreshes every 60 seconds (the `refreshSeconds` block prop, see [Place the panel](#place-the-panel)) and on the refresh button, keeping your place.
 
 It never changes anything on GitHub or in git: GraphQL queries only, and read-only git commands.
 
@@ -48,8 +48,10 @@ herdr-app check ~/.config/herdr-app/mods/project-board
 The mod ships with `place: none`, so installing it changes no layout. Add it to a layout you own (clone one first: `herdr-app do layout.clone '{"name":"main","as":"my-layout"}'`). The usual spot is the right panel's `panel-body` stack, next to `files` and `changes`, about 368px wide:
 
 ```json
-{ "id": "project-board", "type": "block", "content": { "mod": "project-board" } }
+{ "id": "project-board", "type": "block", "content": { "mod": "project-board", "props": { "refreshSeconds": 120 } } }
 ```
+
+`props` is optional. `refreshSeconds` sets how often the board reloads from GitHub: the default is 60 seconds, and values below 60 count as 60. Leave `props` out to keep the default.
 
 To open it from the tab bar, add a button that selects that block, in a tab bar you own: clone it with `herdr-app do mod.clone '{"name":"tabs","as":"my-tabs"}'` and point your layout's tab bar block at `my-tabs`. In that clone, the button's click runs:
 

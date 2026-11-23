@@ -23,10 +23,11 @@ export const subIssue = ({ id, number, title, state = "OPEN", stateReason = null
   subIssuesSummary: summary,
 });
 
-export const pullRequest = ({ id, number, title, state = "OPEN", isDraft = false, status = null }) => ({
+// `url`: the pull request's GitHub page (story #11), left out of the answer when not given.
+export const pullRequest = ({ id, number, title, url, state = "OPEN", isDraft = false, status = null }) => ({
   id: `PVTI_${id}`,
   status,
-  content: { __typename: "PullRequest", id, number, title, state, isDraft },
+  content: { __typename: "PullRequest", id, number, title, url, state, isDraft },
 });
 
 export const draftIssue = ({ id, title, status = null }) => ({

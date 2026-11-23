@@ -4,11 +4,12 @@ import { v_flex, h_flex, ScrollHandle } from "gpui-base";
 import { theme, spaces, panes, checking, props } from "herdr";
 import { activeSpace } from "./src/repo.js";
 import { detectRepo } from "./src/git.js";
-import { loadProjects, loadItems } from "./src/load.js";
+import { loadProjects, loadItems, loadIssue } from "./src/load.js";
+import { parseIssue } from "./src/issue.js";
 import { pickProject, parseItems, buildTree, visibleRows, progress } from "./src/board.js";
 import { classifyError } from "./src/errors.js";
 import { refreshSeconds } from "./src/settings.js";
-import { Panel, Header, Notice, Busy, Button, IconButton, TextButton, Icon, IssueNumber, StatusPill, Progress, Chevron } from "./ui.js";
+import { Panel, Header, Notice, Busy, Button, IconButton, TextButton, Icon, IssueNumber, StatusPill, Progress, Chevron, Markdown, TypeTag, Message } from "./ui.js";
 
 const CONTEXT_POLL_MS = 1000;
 
@@ -97,8 +98,8 @@ function stateIcon(row, t) {
 }
 
 // Top level: chevron, state icon, title and #number, then the Status pill and sub-issue progress.
-// Sub-issues: one line, indented per level, Status last.
-function Row({ node, depth }, open, onToggle) {
+// Sub-issues: one line, indented per level, Status last. A click opens the row's detail (#11).
+function Row({ node, depth }, open, onToggle, onOpen) {
   const t = theme();
   const [icon, color, label] = stateIcon(node, t);
   const titleLine = h_flex()
@@ -108,9 +109,11 @@ function Row({ node, depth }, open, onToggle) {
     .child(Icon(icon, 15).text_color(color).accessibility_label(label))
     .child(div().flex_1().min_w(0).truncate().child(node.title))
     .when(node.number != null, (el) => el.child(IssueNumber(node.number)));
+  // Clickable as in the approved epic #10 prototype (a28afdf, `clickable`).
+  const clickable = (el) =>
+    el.id(`row-${node.key}`).rounded(6).cursor_pointer().hover((s) => s.bg(t.hover)).on_click((_e, cx) => onOpen(cx));
   if (depth)
-    return h_flex()
-      .id(`row-${node.key}`)
+    return clickable(h_flex())
       .flex_none()
       .h(28)
       .pl(depth * 20)
@@ -120,8 +123,7 @@ function Row({ node, depth }, open, onToggle) {
       .child(titleLine.flex_1().min_w(0))
       .when(Boolean(node.status), (el) => el.child(StatusPill(node.status)));
   const percent = progress(node.summary);
-  return v_flex()
-    .id(`row-${node.key}`)
+  return clickable(v_flex())
     .flex_none()
     .px(4)
     .py(5)
@@ -147,7 +149,7 @@ async function findBoard(repo) {
     const pick = pickProject(await loadProjects(repo));
     if (pick.kind === "none") return { kind: "no-board", repo };
     if (pick.kind === "many") return { kind: "many-boards", repo, names: pick.names };
-    return { kind: "board", repo, title: pick.project.title, tree: buildTree(parseItems(await loadItems(pick.project.id))) };
+    return { kind: "board", repo, title: pick.project.title, project: pick.project, tree: buildTree(parseItems(await loadItems(pick.project.id))) };
   } catch (e) {
     // Boards and items alike: gh missing, logged out, missing scope, or any other API error.
     return { kind: classifyError(e), repo, message: e.message };
@@ -165,6 +167,8 @@ export default class ProjectBoard extends View {
     this.screen = { kind: "loading" };
     this.loading = true;
     this.token = 0;
+    // The open issue's detail, shown in place of the list; null shows the list.
+    this.detail = null;
     if (checking()) return;
     this.followFocus(cx);
     cx.timer.every(CONTEXT_POLL_MS, (cx) => this.followFocus(cx));
@@ -208,12 +212,15 @@ export default class ProjectBoard extends View {
         // Another repo: its board as it was left, else the repo while gh reads its boards,
         // never the previous repo's board.
         if (token === this.token && this.screen.repo !== screen.repo) {
+          this.detail = null;
           this.screen = this.board(screen.repo).screen ?? { kind: "loading", repo: screen.repo, folder: sp.folder };
           cx.notify();
         }
         screen = await findBoard(screen.repo);
       }
       if (token !== this.token) return;
+      // A detail stays open over its own repo's board only (a failed refresh keeps it).
+      if (this.detail?.repo !== screen.repo) this.detail = null;
       this.screen = { ...screen, folder: sp?.folder ?? null };
       if (screen.kind === "board") this.board(screen.repo).screen = this.screen;
       this.loading = false;
@@ -233,7 +240,42 @@ export default class ProjectBoard extends View {
     cx.notify();
   }
 
+  // A row or sub-issue row: the list makes way for its detail. Pull requests and draft issues
+  // only link to GitHub; a draft has no page of its own, so it opens the board's item pane.
+  openDetail(node, cx) {
+    const { project, repo } = this.screen;
+    const url = node.type === "DraftIssue" && project?.url && node.itemId ? `${project.url}?pane=issue&itemId=${node.itemId}` : node.url;
+    this.detail = { node: { ...node, url }, repo, projectId: project?.id, data: null, error: null, token: 0 };
+    if (node.type === "Issue") this.loadDetail(this.detail, cx);
+    cx.notify();
+  }
+
+  back(cx) {
+    this.detail = null;
+    cx.notify();
+  }
+
+  loadDetail(d, cx) {
+    const token = ++d.token;
+    d.error = null;
+    cx.notify();
+    cx.spawn(async (cx) => {
+      let data = null;
+      let error = null;
+      try {
+        data = parseIssue(await loadIssue(d.node.key), d.projectId);
+      } catch (e) {
+        error = e.message;
+      }
+      if (token !== d.token) return;
+      d.data = data;
+      d.error = error;
+      cx.notify();
+    });
+  }
+
   render() {
+    if (this.detail) return Panel("project-board").child(this.detailHeader(this.detail)).child(this.detailBody(this.detail));
     const s = this.screen;
     const tryAgain = Button({ id: "try-again", label: "Try again", primary: true, onClick: (cx) => this.load(cx) });
     const notice = NOTICES[s.kind]?.(s, tryAgain);
@@ -279,6 +321,84 @@ export default class ProjectBoard extends View {
       .track_scroll(scroll)
       .px(6)
       .py(4)
-      .children(rows.map((row) => Row(row, expanded.has(row.node.key), (cx) => this.toggle(row.node.key, cx))));
+      .children(
+        rows.map((row) =>
+          Row(
+            row,
+            expanded.has(row.node.key),
+            (cx) => this.toggle(row.node.key, cx),
+            (cx) => this.openDetail(row.node, cx),
+          ),
+        ),
+      );
+  }
+
+  // Back, then what this is: state, type, #number and Status; the title under it.
+  // From the approved epic #10 prototype (a28afdf, `detailHeader`), without its issue refresh (#16).
+  detailHeader(d) {
+    const t = theme();
+    const issue = d.data ?? d.node;
+    const [icon, color, label] = stateIcon(issue, t);
+    return v_flex()
+      .id("detail-header")
+      .flex_none()
+      .pl(6)
+      .pr(12)
+      .py(8)
+      .gap(2)
+      .border_b(1)
+      .border_color(t.border)
+      .child(
+        h_flex()
+          .gap(6)
+          .items_center()
+          .child(IconButton({ id: "back", icon: "chevron-left", label: "Back to the board", onClick: (cx) => this.back(cx) }))
+          .child(Icon(icon, 15).text_color(color).accessibility_label(label))
+          .when(Boolean(issue.issueType), (el) => el.child(TypeTag(issue.issueType)))
+          .when(issue.number != null, (el) => el.child(IssueNumber(issue.number)))
+          .when(Boolean(issue.status), (el) => el.child(StatusPill(issue.status)))
+          .child(div().flex_1())
+          .when(Boolean(issue.url), (el) =>
+            el.child(IconButton({ id: "open-github", icon: "external-link", label: "Open on GitHub", onClick: (cx) => cx.open_url(issue.url) })),
+          ),
+      )
+      .child(div().pl(53).pr(4).font_medium().whitespace_normal().child(issue.title));
+  }
+
+  // The issue's body; sub-issues (#12) and activity (#13) go under it.
+  detailBody(d) {
+    if (d.node.type !== "Issue") {
+      const pr = d.node.type === "PullRequest";
+      return Notice({
+        id: "not-an-issue",
+        icon: pr ? "pull-request" : "draft",
+        title: pr ? "Pull requests open on GitHub" : "Draft issues open on GitHub",
+        detail: pr
+          ? "This panel reads issues. The pull request's conversation, checks and files are on GitHub."
+          : "A draft issue lives only on the board, so there is nothing more to show here.",
+        buttons: d.node.url
+          ? [Button({ id: "open-github-big", label: "Open on GitHub", primary: true, onClick: (cx) => cx.open_url(d.node.url) })]
+          : [],
+      });
+    }
+    if (d.error)
+      return Notice({
+        id: "detail-error",
+        icon: "alert",
+        title: `#${d.node.number} didn't load`,
+        detail: d.error,
+        buttons: [Button({ id: "detail-try-again", label: "Try again", primary: true, onClick: (cx) => this.loadDetail(d, cx) })],
+      });
+    if (!d.data) return Busy(`Loading #${d.node.number}…`, "detail-loading");
+    const { key, body } = d.data;
+    return v_flex()
+      .id(`detail-${key}`)
+      .flex_1()
+      .min_h(0)
+      .overflow_y_scrollbar()
+      .px(14)
+      .py(12)
+      .gap(18)
+      .child(body.trim() ? Markdown(`body-${key}`, body) : Message("No description."));
   }
 }

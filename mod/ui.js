@@ -1,6 +1,6 @@
 // The look: Herdr's own panel conventions as small components. Sizes and shapes follow
 // Branch PR's views/ui.js (munza/herdr-mods, Apache-2.0). UI only: values in, callbacks out.
-import { div, svg } from "gpui-kit";
+import { div, svg, image } from "gpui-kit";
 import { h_flex, v_flex, TextView } from "gpui-base";
 import { theme, settings } from "herdr";
 import { MOD } from "./src/name.js";
@@ -233,6 +233,42 @@ export const Markdown = (id, text) =>
     .scrollable(false)
     .selectable(true)
     .on_link_click((url, cx) => cx.open_url(url));
+
+// An issue image at the text column's full width. GPUI keeps an image's aspect ratio only for a
+// width in pixels, so the frame reports its width (onWidth) and the image is drawn once it is known.
+export function InlineImage({ id, path, alt, width, onWidth }) {
+  const t = theme();
+  return div()
+    .id(id)
+    .flex_none()
+    .w_full()
+    .rounded(6)
+    .overflow_hidden()
+    .border_1()
+    .border_color(t.border)
+    .on_size_change((size, cx) => onWidth(size.width, cx))
+    .when(width > 2, (el) => el.child(image(path).w(width - 2).accessibility_label(alt)));
+}
+
+// Where an issue image will show, while it downloads.
+export function ImageLoading(id, alt) {
+  const t = theme();
+  return h_flex()
+    .id(id)
+    .flex_none()
+    .w_full()
+    .h(72)
+    .px(12)
+    .gap(8)
+    .items_center()
+    .justify_center()
+    .rounded(6)
+    .bg(t.raised)
+    .text_size(TEXT.small)
+    .text_color(t.dim)
+    .child(Icon("refresh", 13).spin(SPIN_MS).accessibility_label("Loading image"))
+    .child(div().min_w(0).truncate().child(`Loading ${alt}…`));
+}
 
 // A part of the issue detail: its name and how many it holds.
 export function SectionLabel(label, count) {

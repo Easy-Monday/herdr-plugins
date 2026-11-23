@@ -1,7 +1,8 @@
 // Prototype mock layer: answers gh calls of epics still in their Prototype gate from fixtures.
 // Return { code, stdout, stderr } like herdr's exec. Unmatched calls go to the real gh.
 // State is in memory: reloading the mod resets it.
-import { exec } from "herdr";
+import { exec, appHome } from "herdr";
+import { MOD } from "./name.js"; // installed next to it as src/mock.js
 
 // Epic #1 (project board panel): the states the owner can pick from the panel's Prototype bar.
 const SCENARIOS = [
@@ -20,6 +21,8 @@ const SCENARIOS = [
   // Epic #10 (issue detail): pick one, then click a row.
   { id: "detail-loading", label: "Issue loading" },
   { id: "detail-error", label: "Issue API error" },
+  // Epic #18 (images inside the panel): open #43 to see its images; downloads wait until another state is picked.
+  { id: "images-loading", label: "Images loading" },
 ];
 
 let scenario = "board";
@@ -61,9 +64,11 @@ function herdrIssues() {
     15: ["Images as Open image links", "Designed"],
     16: ["Issue detail stays current", "Designed"],
     17: ["Epic #10 acceptance tests", "Specified"],
-    40: ["Epic: Images in issue detail", "Backlog", [41, 42]],
-    41: ["Spike: load private images through gh", "Backlog"],
-    42: ["Show images inline through gh", "Done", [], true],
+    40: ["Epic: Images inside the panel", "Specified", [41, 43, 44, 42]],
+    41: ["Spike: load private images through gh", "Done"],
+    42: ["Zoom into an image", "Done", [], true],
+    43: ["Show images inline in the issue detail", "Specified"],
+    44: ["Epic #40 acceptance tests", "Specified"],
     20: ["Development environment", "Done", [21, 22]],
     21: ["Scaffold the repo with tests and CI", "Done"],
     22: ["Add the Prototype mock layer", "Done"],
@@ -119,7 +124,7 @@ function herdrBoard() {
     item("pr29", "In Review", { __typename: "PullRequest", id: "PR_29", number: 29, title: "docs: explain placement in the README", url: `${HERDR_REPO}/pull/29`, state: "OPEN", isDraft: false }),
     item("pr30", "In Progress", { __typename: "PullRequest", id: "PR_30", number: 30, title: "feat(#2): show the repo of the active tab", url: `${HERDR_REPO}/pull/30`, state: "OPEN", isDraft: true }),
     item("draft1", "Backlog", { __typename: "DraftIssue", id: "DI_1", title: "Try Herdr's virtual list for long boards" }, 140213),
-    ...at([27, 32, 33, 40, 41, 42, 20, 21, 22]),
+    ...at([27, 32, 33, 40, 41, 42, 43, 44, 20, 21, 22]),
     item("pr28", "Done", { __typename: "PullRequest", id: "PR_28", number: 28, title: "chore: set up dev environment", url: `${HERDR_REPO}/pull/28`, state: "MERGED", isDraft: false }),
   ];
 }
@@ -172,6 +177,9 @@ function itemsPage({ id, after }) {
 // Epic #10 (issue detail): what an issue's detail query answers. Times are minutes ago.
 const shot = (sha, n, file) => `${HERDR_REPO}/blob/${sha}/docs/screenshots/${n}/${file}?raw=true`;
 const OWNER = "S4n3L"; // every agent posts as the owner's account, as on the real board
+// Epic #18: a full commit sha, so the panel fetches these instead of linking them.
+const PINNED = "8d2b6f0e4a9c1735b8e2d0f4c6a8193e5b7d2c01";
+const pinned = (n, file) => `${HERDR_REPO}/blob/${PINNED}/docs/screenshots/${n}/${file}?raw=true`;
 
 // number: { type, body, comments: [minutes ago, body], events: [minutes ago, previous, status] }
 const DETAILS = {
@@ -328,6 +336,38 @@ The panel stays blank until it is reopened.`,
   },
   32: { type: null, body: "Show the GitHub issue type before each row's title.", events: [], comments: [] },
   33: { type: "Feature", body: "", events: [], comments: [] },
+  43: {
+    type: "Feature",
+    body: `## User story
+As the owner, directing agents, I want to see issue images inside the panel, so that I check screenshots without a browser.
+
+## Acceptance criteria
+- AC-1: Given an image in a body or comment, When the detail shows, Then the image is fetched through gh to a local cache file and shown inline, scaled to the panel width
+- AC-2: Given a cached image URL, When the detail shows again or refreshes, Then the cached file is used and no download runs
+- AC-3: Given the fetch fails, When the detail shows, Then the Open image link from BRD §4.11 shows instead
+
+## Example
+The board as the developer saw it:
+
+![The board list](${pinned(43, "board.png")})`,
+    events: [[4320, "Backlog", "Specified"]],
+    comments: [
+      [90, `Screenshots at ${PINNED.slice(0, 7)}:
+
+![Issue detail with an inline image](${pinned(43, "detail.png")})
+
+<img alt="The panel at its narrowest" src="${pinned(43, "narrow.png")}" width="300">`],
+      [60, `The board screenshot from the description again: it is downloaded once, however often it shows.
+
+![The board list](${pinned(43, "board.png")})`],
+      [30, `This screenshot was deleted from the repo, so its download fails:
+
+![Retina detail](${pinned(43, "retina.png")})`],
+      [10, `Not pinned to a commit (blob/main), so the panel doesn't download it:
+
+![Branch screenshot](${HERDR_REPO}/blob/main/docs/screenshots/43/board.png?raw=true)`],
+    ],
+  },
 };
 
 // Issues without their own entry: a short definition and how they got to their Status.
@@ -452,11 +492,27 @@ mock.git = (args, options) => {
   return ok(args[0] === "symbolic-ref" ? "main\n" : "origin\n");
 };
 
+// Epic #18: an image download. The fixture with the URL's file name is copied to `out` after a
+// short wait, as gh would write it; a name without a fixture answers 404. `api` of each download, newest last.
+const FIXTURES = ["board.png", "detail.png", "narrow.png"];
+const downloads = [];
+mock.image = async (api, out) => {
+  downloads.push(api);
+  if (scenario === "images-loading") await new Promise((resolve) => held.push(resolve));
+  else await exec("sleep", ["1.5"]);
+  const file = api.split("?")[0].split("/").pop();
+  if (!FIXTURES.includes(file)) return { code: 1, stdout: "", stderr: "gh: Not Found (HTTP 404)" };
+  await exec("mkdir", ["-p", out.slice(0, out.lastIndexOf("/"))]);
+  return exec("cp", [`${appHome()}/mods/${MOD}/mock/images/${file}`, out]);
+};
+mock.downloads = downloads;
+
 mock.scenarios = SCENARIOS;
 mock.scenario = () => scenario;
 mock.choose = (id) => {
   scenario = id;
   failNext = id === "api-error" || id === "detail-error";
+  downloads.length = 0;
   const waiting = held;
   held = [];
   for (const release of waiting) release();

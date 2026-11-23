@@ -1,13 +1,15 @@
 // Project Board: a read-only panel showing the GitHub project board of the active tab's repo.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, ScrollHandle } from "gpui-base";
-import { theme, spaces, panes, checking, props } from "herdr";
+import { theme, spaces, panes, checking, props, appHome } from "herdr";
 import { mock } from "./src/mock.js";
+import { MOD } from "./src/name.js";
+import { fetchImage } from "./src/gh.js";
 import { detectRepo } from "./src/git.js";
 import { loadProjects, loadItems, loadIssue } from "./src/load.js";
 import { parseIssue } from "./src/issue.js";
 import { mergeActivity, isHandoff, relativeTime, statusLine } from "./src/activity.js";
-import { imageLinks } from "./src/images.js";
+import { imageLinks, imageLink, imageSource, cachePath, splitImages } from "./src/images.js";
 import { pickProject, parseItems, buildTree, visibleRows, progress } from "./src/board.js";
 import { classifyError } from "./src/errors.js";
 import {
@@ -19,6 +21,8 @@ import {
   HandoffTag,
   Icon,
   IconButton,
+  ImageLoading,
+  InlineImage,
   IssueNumber,
   Markdown,
   Message,
@@ -34,6 +38,11 @@ import {
 const CONTEXT_POLL_MS = 1000;
 // shortcut: fixed at 60 s; story #8 reads the interval from the mod setting (60 s minimum).
 const REFRESH_MS = 60000;
+// Herdr draws a freshly written image empty until a later redraw once it has decoded it (spike #19),
+// and gives no load event. shortcut: redraws at fixed times; a big image that decodes slower shows
+// at the next redraw for another reason.
+const IMAGE_REDRAWS_MS = [300, 1000, 2500];
+const IMAGES = `data/${MOD}/images`; // image() paths are relative to the app folder
 
 // localStorage can be missing (tests) or refuse; the toggle then just isn't remembered.
 const stored = (key) => {
@@ -97,6 +106,9 @@ export default class ProjectBoard extends View {
     this.prototypeOpen = false;
     // Open issue details, the shown one last; Back goes one step up, then to the list.
     this.trail = [];
+    // Image URL -> "loading" | "ready" | "failed", for the life of this copy: one fetch per URL.
+    this.images = new Map();
+    this.widths = new Map(); // inline image id -> its frame's width, as laid out
     if (checking()) return;
     this.followFocus(cx);
     cx.timer.every(CONTEXT_POLL_MS, (cx) => this.followFocus(cx));
@@ -235,7 +247,60 @@ export default class ProjectBoard extends View {
       d.error = error;
       d.loading = false;
       cx.notify();
+      if (data) this.fetchImages([data.body, ...data.comments.map((c) => c.body)], cx);
     });
+  }
+
+  // Each image URL is fetched once; a refresh or another look at the issue uses what came back.
+  fetchImages(texts, cx) {
+    const images = this.images;
+    for (const text of texts)
+      for (const { url } of splitImages(text)) {
+        if (!url || images.has(url)) continue;
+        images.set(url, "loading");
+        cx.spawn(async (cx) => {
+          let result = null;
+          try {
+            result = await fetchImage(imageSource(url).api, cachePath(url, `${appHome()}/${IMAGES}`));
+          } catch {}
+          const ready = result?.code === 0;
+          images.set(url, ready ? "ready" : "failed");
+          cx.notify();
+          if (ready) for (const ms of IMAGE_REDRAWS_MS) cx.timer.after(ms, (cx) => cx.notify());
+        });
+      }
+  }
+
+  // Markdown with its fetchable images cut out and drawn inline; with none, one Markdown as before.
+  rich(id, md) {
+    const parts = splitImages(md);
+    if (!parts.some((p) => p.url)) return Markdown(id, imageLinks(md));
+    return v_flex()
+      .id(id)
+      .flex_none()
+      .w_full()
+      .min_w(0)
+      .gap(8)
+      .children(
+        parts.map((p, i) => {
+          const part = `${id}-${i}`;
+          if (!p.url) return Markdown(part, imageLinks(p.text));
+          const state = this.images.get(p.url) ?? "loading";
+          if (state === "failed") return Markdown(part, imageLink(p.alt, p.url));
+          if (state === "loading") return ImageLoading(part, p.alt);
+          return InlineImage({
+            id: part,
+            path: cachePath(p.url, IMAGES),
+            alt: p.alt,
+            width: this.widths.get(part),
+            onWidth: (width, cx) => {
+              if (this.widths.get(part) === width) return;
+              this.widths.set(part, width);
+              cx.notify();
+            },
+          });
+        }),
+      );
   }
 
   render() {
@@ -547,7 +612,7 @@ export default class ProjectBoard extends View {
             .child(TextButton({ id: "detail-try-again", label: "Try again", onClick: retry })),
         ),
       )
-      .child(issue.body.trim() ? Markdown(`body-${issue.key}`, imageLinks(issue.body)) : Message("No description."))
+      .child(issue.body.trim() ? this.rich(`body-${issue.key}`, issue.body) : Message("No description."))
       .when(issue.subIssues.length > 0, (el) =>
         el.child(
           v_flex()
@@ -618,7 +683,7 @@ export default class ProjectBoard extends View {
           )
           .when(handoff, (el) => el.child(HandoffTag(`handoff-${c.id}`))),
       )
-      .child(Markdown(`comment-body-${c.id}`, imageLinks(c.body || "")));
+      .child(this.rich(`comment-body-${c.id}`, c.body || ""));
   }
 
   statusChange(e, now) {
@@ -662,7 +727,10 @@ export default class ProjectBoard extends View {
           })
           .child(Icon(this.prototypeOpen ? "chevron-down" : "chevron-right", 11))
           .child("Prototype state")
-          .child(div().text_color(t.foreground).child(current?.label ?? "")),
+          .child(div().text_color(t.foreground).child(current?.label ?? ""))
+          // Epic #18: images downloaded since the state was picked; one per URL however often it shows.
+          .child(div().flex_1())
+          .child(div().id("image-downloads").child(`Image downloads: ${mock.downloads.length}`)),
       )
       .when(this.prototypeOpen, (el) =>
         el.child(
@@ -681,6 +749,7 @@ export default class ProjectBoard extends View {
                     this.closeDetails();
                     // shortcut: drops the old handles unreleased (a few per click); prototype only.
                     this.boards.clear();
+                    this.images = new Map(); // a fetch still running lands in the old one
                     this.load(cx);
                   },
                 }),

@@ -1,4 +1,4 @@
-// Prototype self-check for epics #1 and #10: each click path of the handoff, run against a prototype
+// Prototype self-check for epics #1, #10 and #18: each click path of the handoff, run against a prototype
 // install (mock layer on, as `npm run prototype` writes it). The stories' tests replace it.
 // Herdr-only behaviour (real scroll offsets, smooth scrolling, a remote machine, localStorage
 // across a reload) is tested here up to the state the harness can reach; the owner confirms
@@ -35,7 +35,12 @@ const REPOS = {
 };
 const gitCalls = [];
 const ok = (stdout) => ({ code: 0, stdout, stderr: "" });
+const fileCalls = []; // the prototype's image downloads (epic #18): sleep, mkdir, cp
 herdrStub.exec = (command, args, options = {}) => {
+  if (["sleep", "mkdir", "cp"].includes(command)) {
+    fileCalls.push([command, ...args]);
+    return ok("");
+  }
   if (command !== "git") return { code: 1, stdout: "", stderr: `unexpected ${command} call` };
   gitCalls.push({ args, options });
   const repo = REPOS[options.cwd];
@@ -629,4 +634,78 @@ test("#16 AC-2: a refresh keeps the same issue open at the same scroll position"
   await settle();
   assert.equal(part(app, "detail-I_16").props.track_scroll, handle);
   assert.equal(part(app, "board-list"), null);
+});
+
+// #20 Show images inline in the issue detail (epic #18). Herdr-only: the drawn image and its
+// scaling; the owner confirms those in Herdr. Here: which part shows, its cache path, and each download.
+
+const SHOTS = `${HERDR}/blob/8d2b6f0e4a9c1735b8e2d0f4c6a8193e5b7d2c01/docs/screenshots/43`;
+async function story43(app, { wait = true } = {}) {
+  app ??= await open();
+  if (!byId(app.tree(), "row-I_43")) await press(app, "chevron-I_40"); // #43 sits under epic #40
+  click(app.tree(), "row-I_43");
+  if (wait) await settle();
+  else for (let i = 0; i < 5; i++) await new Promise((resolve) => setImmediate(resolve));
+  return app;
+}
+// Lays the detail out as Herdr would (each image frame 600 px wide), then lists the drawn images.
+const images = (app) => {
+  walk(part(app, "detail-I_43"), (n) => n.handlers.on_size_change?.({ width: 600, height: 0 }, cx));
+  const found = [];
+  walk(part(app, "detail-I_43"), (n) => {
+    if (n.kind === "image") found.push(n);
+  });
+  return found;
+};
+const downloads = (app) => text(part(app, "image-downloads")).trim();
+const copies = () => fileCalls.filter(([command]) => command === "cp");
+
+test("#20 AC-1: an image in a body or comment is downloaded to the cache and shown inline at full width", async () => {
+  const app = await open();
+  await pick(app, "images-loading"); // downloads wait: the placeholders show
+  await story43(app, { wait: false });
+  assert.match(text(part(app, "body-I_43-1")), /Loading The board list…/);
+  assert.match(text(part(app, "comment-body-IC_43_0-1")), /Loading Issue detail with an inline image…/);
+  assert.deepEqual(images(app), []);
+  await pick(app, "board"); // releases them
+  const before = copies().length;
+  await story43(app);
+  const shown = images(app);
+  assert.equal(shown.length, 4); // board (body and a comment), detail, narrow
+  assert.ok(shown.every((n) => n.props.w === 598)); // the frame's width inside its 1 px border
+  const board = part(app, "body-I_43-1");
+  const path = board.kids[0].props.path;
+  assert.match(path, /^data\/project-board-prototype\/images\/[0-9a-f]{14}\.png$/);
+  assert.equal(board.kids[0].props.accessibility_label, "The board list");
+  assert.ok(
+    copies()
+      .slice(before)
+      .some(([, from, to]) => from.endsWith("/mods/project-board-prototype/mock/images/board.png") && to === `/home/test/.config/herdr-app/${path}`),
+  );
+  assert.ok(timers.some((t) => t.ms === 300)); // the redraw after an image lands
+  assert.match(text(part(app, "body-I_43-0")), /## User story/); // the text around it stays markdown
+});
+
+test("#20 AC-2: a downloaded image is not downloaded again on refresh or when the issue shows again", async () => {
+  const app = await story43();
+  assert.equal(downloads(app), "Image downloads: 4"); // the board shot shows twice, downloaded once
+  const copied = copies().length;
+  await press(app, "refresh");
+  app.timers.find((t) => t.ms === 60000).fn(cx);
+  await settle();
+  await press(app, "back");
+  await story43(app);
+  assert.equal(downloads(app), "Image downloads: 4");
+  assert.equal(copies().length, copied);
+  assert.equal(images(app).length, 4);
+});
+
+test("#20 AC-3: when a download fails, the Open image link shows instead", async () => {
+  const app = await story43();
+  const failed = markdownOf(app, "comment-body-IC_43_2-1");
+  assert.equal(text(failed), `[Open image: Retina detail](${SHOTS}/retina.png?raw=true)`);
+  failed.handlers.on_link_click(`${SHOTS}/retina.png?raw=true`, cx);
+  assert.equal(opened.at(-1), `${SHOTS}/retina.png?raw=true`);
+  // An image not pinned to a commit is never downloaded: it is the link from the start.
+  assert.match(text(markdownOf(app, "comment-body-IC_43_3")), /\[Open image: Branch screenshot\]\(.*\/blob\/main\//);
 });

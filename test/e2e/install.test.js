@@ -30,4 +30,5 @@ test("should install the prototype copy with the mock layer", () => {
   assert.equal(dest, join(home, "mods/project-board-prototype"));
   assert.match(readFileSync(join(dest, "src/mock.js"), "utf8"), /export function mock/);
   assert.match(readFileSync(join(dest, "src/name.js"), "utf8"), /"project-board-prototype"/);
+  assert.ok(existsSync(join(dest, "mock/images/board.png"))); // image download fixtures (epic #18)
 });

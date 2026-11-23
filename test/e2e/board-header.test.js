@@ -8,10 +8,13 @@ import { setImmediate as nextTurn } from "node:timers/promises";
 import { herdrStub, mount, settle, tick, text, timers, cx } from "../support/harness.js";
 
 const ok = (stdout) => ({ code: 0, stdout, stderr: "" });
+// Story #5 also reads the board's items; those calls get an empty page.
+const isBoardsQuery = (args) => args.some((a) => a.startsWith("query=") && a.includes("projectsV2"));
+const noItems = ok(JSON.stringify({ data: { node: { items: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } } }));
 
 function world(folder, repo, ghAnswer) {
   herdrStub.exec = (command, args, options = {}) => {
-    if (command === "gh") return ghAnswer;
+    if (command === "gh") return isBoardsQuery(args) ? ghAnswer : noItems;
     if (command !== "git" || options.cwd !== folder) return { code: 128, stdout: "", stderr: "fatal" };
     if (args[0] === "remote" && args.length === 1) return ok("origin\n");
     if (args[0] === "remote") return ok(`https://github.com/${repo}.git\n`);
@@ -80,6 +83,7 @@ test("should find the open board when closed boards fill the first page", async 
   const asked = [];
   herdrStub.exec = (command, args, options) => {
     if (command !== "gh") return gitOnly(command, args, options);
+    if (!isBoardsQuery(args)) return noItems;
     asked.push(args);
     if (!args.includes(`after=cur-${s}`))
       return boards([{ id: "C", number: 1, title: `Old ${s}`, closed: true }], { hasNextPage: true, endCursor: `cur-${s}` });

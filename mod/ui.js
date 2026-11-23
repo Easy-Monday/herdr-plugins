@@ -4,10 +4,15 @@
 // installed mod name, and Panel takes the id directly and has no rounded border.
 import { div, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { theme } from "herdr";
+import { theme, settings } from "herdr";
 import { MOD } from "./src/name.js";
+import { statusColor } from "./src/status.js";
 
 export const TEXT = { caption: 11, small: 12, body: 13 };
+
+// A theme colour at low strength, for a pill's fill.
+const tint = (color) => (/^#[0-9a-f]{6}/i.test(color) ? `${color.slice(0, 7)}24` : color);
+const codeFont = () => settings().font_family ?? "JetBrains Mono";
 
 export const Icon = (name, size = 14) => svg(`mods/${MOD}/icons/${name}.svg`).size(size).flex_none();
 
@@ -46,6 +51,44 @@ export function Header({ title, subtitle }) {
         ),
     );
 }
+
+// StatusPill, Progress and IssueNumber follow the approved epic #1 prototype (epic/1-prototype, cac901d).
+export function StatusPill(status) {
+  const t = theme();
+  const color = statusColor(status.color, t);
+  return div()
+    .flex_none()
+    .h(18)
+    .px(7)
+    .flex()
+    .items_center()
+    .rounded(9)
+    .bg(tint(color))
+    .text_size(TEXT.caption)
+    .text_color(color)
+    .child(status.name);
+}
+
+export function Progress(percent) {
+  const t = theme();
+  return h_flex()
+    .flex_none()
+    .gap(6)
+    .items_center()
+    .accessibility_label(`${percent}% of sub-issues closed`)
+    .child(
+      div()
+        .w(64)
+        .h(4)
+        .rounded(2)
+        .bg(t.raised)
+        .child(div().h(4).w(Math.round(0.64 * percent)).rounded(2).bg(t.ansi2)),
+    )
+    .child(div().text_size(TEXT.caption).text_color(t.dim).child(`${percent}%`));
+}
+
+export const IssueNumber = (n) =>
+  div().flex_none().text_size(TEXT.caption).text_color(theme().dim).font_family(codeFont()).child(`#${n}`);
 
 // A whole-panel message: an icon, what happened, what to do, then a list of names.
 export function Notice({ id, icon, title, detail, list }) {

@@ -6,10 +6,11 @@ import { activeSpace } from "./src/repo.js";
 import { detectRepo } from "./src/git.js";
 import { loadProjects, loadItems, loadIssue } from "./src/load.js";
 import { parseIssue } from "./src/issue.js";
+import { mergeActivity, relativeTime, statusLine } from "./src/activity.js";
 import { pickProject, parseItems, buildTree, visibleRows, progress } from "./src/board.js";
 import { classifyError } from "./src/errors.js";
 import { refreshSeconds } from "./src/settings.js";
-import { Panel, Header, Notice, Busy, Button, IconButton, TextButton, Icon, IssueNumber, StatusPill, Progress, Chevron, Markdown, TypeTag, Message } from "./ui.js";
+import { TEXT, Panel, Header, Notice, Busy, Button, IconButton, TextButton, Icon, IssueNumber, StatusPill, Progress, Chevron, Markdown, TypeTag, Message, SectionLabel } from "./ui.js";
 
 const CONTEXT_POLL_MS = 1000;
 
@@ -365,7 +366,7 @@ export default class ProjectBoard extends View {
       .child(div().pl(53).pr(4).font_medium().whitespace_normal().child(issue.title));
   }
 
-  // The issue's body; sub-issues (#12) and activity (#13) go under it.
+  // The issue's body, then its activity (#13); sub-issues (#12) go between them.
   detailBody(d) {
     if (d.node.type !== "Issue") {
       const pr = d.node.type === "PullRequest";
@@ -390,7 +391,9 @@ export default class ProjectBoard extends View {
         buttons: [Button({ id: "detail-try-again", label: "Try again", primary: true, onClick: (cx) => this.loadDetail(d, cx) })],
       });
     if (!d.data) return Busy(`Loading #${d.node.number}…`, "detail-loading");
-    const { key, body } = d.data;
+    const { key, body, comments, events } = d.data;
+    const activity = mergeActivity(comments, events);
+    const now = Date.now();
     return v_flex()
       .id(`detail-${key}`)
       .flex_1()
@@ -399,6 +402,49 @@ export default class ProjectBoard extends View {
       .px(14)
       .py(12)
       .gap(18)
-      .child(body.trim() ? Markdown(`body-${key}`, body) : Message("No description."));
+      .child(body.trim() ? Markdown(`body-${key}`, body) : Message("No description."))
+      .child(
+        v_flex()
+          .id("activity")
+          .flex_none()
+          .gap(12)
+          .child(SectionLabel("Activity", activity.length))
+          .when(!activity.length, (el) => el.child(Message("No comments or Status changes yet.")))
+          .children(activity.map((a) => (a.kind === "comment" ? this.comment(a, now) : this.statusChange(a, now)))),
+      );
+  }
+
+  // Author, relative time, then the body as markdown (from the approved epic #10 prototype, a28afdf,
+  // `comment`, without its handoff tag: #14 marks handoffs here).
+  comment(c, now) {
+    const t = theme();
+    return v_flex()
+      .id(`comment-${c.id}`)
+      .flex_none()
+      .min_w(0)
+      .gap(4)
+      .child(
+        h_flex()
+          .gap(6)
+          .items_center()
+          .child(div().flex_none().font_medium().text_size(TEXT.small).child(c.author?.login ?? "ghost"))
+          .child(div().flex_1().min_w(0).truncate().text_size(TEXT.caption).text_color(t.dim).child(relativeTime(c.createdAt, now))),
+      )
+      .child(Markdown(`comment-body-${c.id}`, c.body || ""));
+  }
+
+  // One dim line with the board icon: "In Progress → In Review · 25m ago" (prototype `statusChange`).
+  statusChange(e, now) {
+    const t = theme();
+    return h_flex()
+      .id(`status-${e.id}`)
+      .flex_none()
+      .min_w(0)
+      .gap(6)
+      .items_center()
+      .text_size(TEXT.caption)
+      .text_color(t.dim)
+      .child(Icon("board", 12))
+      .child(div().flex_1().min_w(0).truncate().child(statusLine(e, now)));
   }
 }

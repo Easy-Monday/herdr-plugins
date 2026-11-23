@@ -1,6 +1,6 @@
 // An issue's detail as GitHub's answer gives it, as a plain function: no Herdr, no drawing.
 // Adapted from the approved epic #10 prototype (epic/10-prototype, a28afdf, mod/src/issue.js).
-// Changed: only the header and body (story #11); sub-issues and activity come with #12 and #13.
+// Changed: the header, body (story #11) and activity (#13); sub-issues come with #12.
 
 // The issue's Status on this board; null when it isn't on it or has none.
 function statusOn(projectItems, projectId) {
@@ -22,5 +22,8 @@ export function parseIssue(response, projectId) {
     stateReason: i.stateReason ?? null,
     status: statusOn(i.projectItems, projectId),
     body: i.body ?? "",
+    comments: (i.comments?.nodes ?? []).filter(Boolean),
+    // timelineItems holds only Status changes (load.js asks for no other type).
+    events: (i.timelineItems?.nodes ?? []).filter((e) => e?.createdAt),
   };
 }

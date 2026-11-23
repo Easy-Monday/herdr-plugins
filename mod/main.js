@@ -3,20 +3,51 @@ import { View } from "gpui-kit";
 import { spaces, panes, checking } from "herdr";
 import { activeSpace } from "./src/repo.js";
 import { detectRepo } from "./src/git.js";
+import { loadProjects } from "./src/load.js";
+import { pickProject } from "./src/board.js";
 import { Panel, Header, Notice } from "./ui.js";
 
 const CONTEXT_POLL_MS = 1000;
 
 const NOTICES = {
-  "not-git": {
+  "not-git": () => ({
+    icon: "folder",
     title: "Not a git repo",
     detail: "The panel follows the focused terminal. cd into a repo, or switch to a tab in one.",
-  },
-  "no-remote": {
+  }),
+  "no-remote": () => ({
+    icon: "folder",
     title: "No GitHub remote",
     detail: "This repo has no remote on github.com, so it has no board to show.",
-  },
+  }),
+  "no-board": (s) => ({
+    icon: "board",
+    title: `No project board is linked to ${s.repo}.`,
+    detail: "Link a board to the repo on GitHub, then refresh.",
+  }),
+  "many-boards": (s) => ({
+    icon: "board",
+    title: "Only one linked board is supported",
+    detail: `${s.repo} has ${s.names.length} open boards linked:`,
+    list: s.names,
+  }),
+  "git-error": (s) => ({ icon: "folder", title: "Couldn't read this folder", detail: s.message }),
+  // shortcut: one generic gh message; story #4 tells gh missing, signed out and offline apart.
+  "gh-error": (s) => ({ icon: "board", title: "Couldn't read the repo's boards", detail: s.message }),
 };
+
+// The linked boards of a repo, as a screen state.
+async function findBoard(repo) {
+  let pick;
+  try {
+    pick = pickProject(await loadProjects(repo));
+  } catch (e) {
+    return { kind: "gh-error", repo, message: e.message };
+  }
+  if (pick.kind === "none") return { kind: "no-board", repo };
+  if (pick.kind === "many") return { kind: "many-boards", repo, names: pick.names };
+  return { kind: "board", repo, title: pick.project.title };
+}
 
 export default class ProjectBoard extends View {
   init(_props, cx) {
@@ -28,7 +59,7 @@ export default class ProjectBoard extends View {
     cx.timer.every(CONTEXT_POLL_MS, (cx) => this.followFocus(cx));
   }
 
-  // Switching tab, space or pane, or `cd` in the terminal, re-resolves the repo.
+  // Switching tab, space or pane, or `cd` in the terminal, re-resolves the repo and its board.
   followFocus(cx) {
     const sp = activeSpace(spaces(), panes(), this.lastFolder);
     const key = sp ? `${sp.machine ?? "local"}:${sp.folder}` : "";
@@ -43,6 +74,7 @@ export default class ProjectBoard extends View {
         // exec rejects when git can't start: not installed, folder gone, machine unreachable.
         screen = { kind: "git-error", message: e.message };
       }
+      if (screen.kind === "repo") screen = await findBoard(screen.repo);
       if (token !== this.token) return;
       this.screen = { ...screen, folder: sp?.folder ?? null };
       cx.notify();
@@ -51,10 +83,9 @@ export default class ProjectBoard extends View {
 
   render() {
     const s = this.screen;
-    const notice =
-      NOTICES[s.kind] ?? (s.kind === "git-error" ? { title: "Couldn't read this folder", detail: s.message } : null);
+    const notice = NOTICES[s.kind]?.(s);
     return Panel("project-board")
-      .child(Header({ title: "Project Board", subtitle: s.repo ?? s.folder }))
-      .when(Boolean(notice), (el) => el.child(Notice({ id: s.kind, icon: "folder", ...notice })));
+      .child(Header({ title: s.kind === "board" ? s.title : "Project Board", subtitle: s.repo ?? s.folder }))
+      .when(Boolean(notice), (el) => el.child(Notice({ id: s.kind, ...notice })));
   }
 }

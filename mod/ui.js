@@ -47,8 +47,8 @@ export function Header({ title, subtitle }) {
     );
 }
 
-// A whole-panel message: an icon, what happened, what to do.
-export function Notice({ id, icon, title, detail }) {
+// A whole-panel message: an icon, what happened, what to do, then a list of names.
+export function Notice({ id, icon, title, detail, list }) {
   const t = theme();
   return v_flex()
     .id(id)
@@ -62,5 +62,12 @@ export function Notice({ id, icon, title, detail }) {
     .child(div().font_medium().text_center().whitespace_normal().child(title))
     .when(Boolean(detail), (el) =>
       el.child(div().text_size(TEXT.small).text_color(t.muted).whitespace_normal().text_center().child(detail)),
+    )
+    .when(Boolean(list), (el) =>
+      el.child(
+        v_flex()
+          .gap(4)
+          .children(list.map((name) => div().text_size(TEXT.small).text_color(t.foreground).whitespace_normal().text_center().child(name))),
+      ),
     );
 }

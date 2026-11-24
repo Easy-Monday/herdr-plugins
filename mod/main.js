@@ -176,8 +176,11 @@ export default class ProjectBoard extends View {
     this.followFocus(cx);
     cx.timer.every(CONTEXT_POLL_MS, (cx) => this.followFocus(cx));
     // Timers run while hidden too, so this is the only poll of GitHub: never faster than the setting.
+    // It reloads the shown issue too (#16), as the approved epic #10 prototype (a28afdf) does.
     cx.timer.every(refreshSeconds(props()) * 1000, (cx) => {
       if (!this.loading) this.load(cx);
+      const shown = this.shown();
+      if (shown?.node.type === "Issue" && !shown.loading) this.loadDetail(shown, cx);
     });
   }
 
@@ -215,7 +218,7 @@ export default class ProjectBoard extends View {
         // Another repo: its board as it was left, else the repo while gh reads its boards,
         // never the previous repo's board.
         if (token === this.token && this.screen.repo !== screen.repo) {
-          this.trail = [];
+          this.closeDetails();
           this.screen = this.board(screen.repo).screen ?? { kind: "loading", repo: screen.repo, folder: sp.folder };
           cx.notify();
         }
@@ -223,7 +226,7 @@ export default class ProjectBoard extends View {
       }
       if (token !== this.token) return;
       // A detail stays open over its own repo's board only (a failed refresh keeps it).
-      if (this.trail[0]?.repo !== screen.repo) this.trail = [];
+      if (this.trail[0]?.repo !== screen.repo) this.closeDetails();
       this.screen = { ...screen, folder: sp?.folder ?? null };
       if (screen.kind === "board") this.board(screen.repo).screen = this.screen;
       this.loading = false;
@@ -251,24 +254,32 @@ export default class ProjectBoard extends View {
   // A row, a sub-issue row or a sub-issue in a detail: its detail goes on top of the trail. Pull requests and draft issues
   // only link to GitHub; a draft has no page of its own, so it opens the board's item pane.
   // From a detail, the board is that detail's: a failed refresh leaves the screen without one.
+  // Not callable from render: each detail keeps its scroll in its own ScrollHandle (prototype a28afdf).
   openDetail(node, cx) {
     const { project, repo } = this.screen;
     const from = this.shown();
     const url = node.type === "DraftIssue" && project?.url && node.itemId ? `${project.url}?pane=issue&itemId=${node.itemId}` : node.url;
-    const d = { node: { ...node, url }, repo: from?.repo ?? repo, projectId: from ? from.projectId : project?.id, data: null, error: null, token: 0 };
+    const d = { node: { ...node, url }, repo: from?.repo ?? repo, projectId: from ? from.projectId : project?.id, data: null, error: null, loading: false, token: 0, scroll: ScrollHandle.new() };
     this.trail.push(d);
     if (node.type === "Issue") this.loadDetail(d, cx);
     cx.notify();
   }
 
   back(cx) {
-    this.trail.pop();
+    this.trail.pop()?.scroll.release();
     cx.notify();
   }
 
+  closeDetails() {
+    for (const d of this.trail) d.scroll.release();
+    this.trail = [];
+  }
+
+  // A reload keeps what's shown, so the detail and its scroll stay put; a failed one keeps the
+  // last loaded issue and shows the error above it (approved epic #10 prototype, a28afdf).
   loadDetail(d, cx) {
     const token = ++d.token;
-    d.error = null;
+    d.loading = true;
     cx.notify();
     cx.spawn(async (cx) => {
       let data = null;
@@ -279,8 +290,9 @@ export default class ProjectBoard extends View {
         error = e.message;
       }
       if (token !== d.token) return;
-      d.data = data;
+      if (data) d.data = data;
       d.error = error;
+      d.loading = false;
       cx.notify();
     });
   }
@@ -346,7 +358,7 @@ export default class ProjectBoard extends View {
   }
 
   // Back, then what this is: state, type, #number and Status; the title under it.
-  // From the approved epic #10 prototype (a28afdf, `detailHeader`), without its issue refresh (#16).
+  // From the approved epic #10 prototype (a28afdf, `detailHeader`).
   detailHeader(d) {
     const t = theme();
     const issue = d.data ?? d.node;
@@ -378,6 +390,9 @@ export default class ProjectBoard extends View {
           .when(issue.number != null, (el) => el.child(IssueNumber(issue.number)))
           .when(Boolean(issue.status), (el) => el.child(StatusPill(issue.status)))
           .child(div().flex_1())
+          .when(d.node.type === "Issue", (el) =>
+            el.child(IconButton({ id: "refresh", icon: "refresh", label: "Refresh issue", spinning: d.loading, onClick: (cx) => this.loadDetail(d, cx) })),
+          )
           .when(Boolean(issue.url), (el) =>
             el.child(IconButton({ id: "open-github", icon: "external-link", label: "Open on GitHub", onClick: (cx) => cx.open_url(issue.url) })),
           ),
@@ -387,6 +402,7 @@ export default class ProjectBoard extends View {
 
   // The issue's body, its sub-issues (#12), then its activity (#13).
   detailBody(d) {
+    const t = theme();
     if (d.node.type !== "Issue") {
       const pr = d.node.type === "PullRequest";
       return Notice({
@@ -401,13 +417,14 @@ export default class ProjectBoard extends View {
           : [],
       });
     }
-    if (d.error)
+    const retry = (cx) => this.loadDetail(d, cx);
+    if (!d.data && d.error)
       return Notice({
         id: "detail-error",
         icon: "alert",
         title: `#${d.node.number} didn't load`,
         detail: d.error,
-        buttons: [Button({ id: "detail-try-again", label: "Try again", primary: true, onClick: (cx) => this.loadDetail(d, cx) })],
+        buttons: [Button({ id: "detail-try-again", label: "Try again", primary: true, onClick: retry })],
       });
     if (!d.data) return Busy(`Loading #${d.node.number}…`, "detail-loading");
     const { key, body, subIssues, comments, events } = d.data;
@@ -418,9 +435,23 @@ export default class ProjectBoard extends View {
       .flex_1()
       .min_h(0)
       .overflow_y_scrollbar()
+      .track_scroll(d.scroll)
       .px(14)
       .py(12)
       .gap(18)
+      .when(Boolean(d.error), (el) =>
+        el.child(
+          h_flex()
+            .id("detail-stale")
+            .flex_none()
+            .gap(8)
+            .items_center()
+            .text_size(TEXT.small)
+            .text_color(t.ansi1)
+            .child(div().flex_1().min_w(0).whitespace_normal().child(`Couldn't refresh: ${d.error}`))
+            .child(TextButton({ id: "detail-try-again", label: "Try again", onClick: retry })),
+        ),
+      )
       .child(body.trim() ? Markdown(`body-${key}`, imageLinks(body)) : Message("No description."))
       .when(subIssues.length > 0, (el) =>
         el.child(

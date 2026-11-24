@@ -14,6 +14,7 @@ import { refreshSeconds } from "./src/settings.js";
 import { TEXT, Panel, Header, Notice, Busy, Button, IconButton, TextButton, Icon, IssueNumber, StatusPill, Progress, Chevron, Markdown, TypeTag, Message, SectionLabel, HandoffTag } from "./ui.js";
 
 const CONTEXT_POLL_MS = 1000;
+const LINKED_BODIES = 200; // bodies kept with their images rewritten, oldest dropped first (#52)
 
 // localStorage can be missing (tests) or refuse; the toggle then just isn't remembered.
 const stored = (key) => {
@@ -165,6 +166,8 @@ export default class ProjectBoard extends View {
     // shows another board or is hidden. A hidden copy isn't drawn, so the list's own scroll
     // state is dropped; a ScrollHandle kept on the view holds it.
     this.boards = new Map();
+    // Body → body with images as links: render() runs on every redraw, so each body is scanned once (#52).
+    this.linked = new Map();
     this.showDone = stored("show-done") === "on";
     this.screen = { kind: "loading" };
     this.loading = true;
@@ -400,6 +403,17 @@ export default class ProjectBoard extends View {
       .child(div().pl(53).pr(4).font_medium().whitespace_normal().child(issue.title));
   }
 
+  // `imageLinks` (BRD §4.11), memoized per body text in `this.linked` (bounded, oldest out first).
+  imageLinks(body) {
+    let out = this.linked.get(body);
+    if (out === undefined) {
+      out = imageLinks(body);
+      if (this.linked.size >= LINKED_BODIES) this.linked.delete(this.linked.keys().next().value);
+      this.linked.set(body, out);
+    }
+    return out;
+  }
+
   // The issue's body, its sub-issues (#12), then its activity (#13).
   detailBody(d) {
     const t = theme();
@@ -452,7 +466,7 @@ export default class ProjectBoard extends View {
             .child(TextButton({ id: "detail-try-again", label: "Try again", onClick: retry })),
         ),
       )
-      .child(body.trim() ? Markdown(`body-${key}`, imageLinks(body)) : Message("No description."))
+      .child(body.trim() ? Markdown(`body-${key}`, this.imageLinks(body)) : Message("No description."))
       .when(subIssues.length > 0, (el) =>
         el.child(
           v_flex()
@@ -518,7 +532,7 @@ export default class ProjectBoard extends View {
           .child(div().flex_1().min_w(0).truncate().text_size(TEXT.caption).text_color(t.dim).child(relativeTime(c.createdAt, now)))
           .when(handoff, (el) => el.child(HandoffTag(`handoff-${c.id}`))),
       )
-      .child(Markdown(`comment-body-${c.id}`, imageLinks(c.body || "")));
+      .child(Markdown(`comment-body-${c.id}`, this.imageLinks(c.body || "")));
   }
 
   // One dim line with the board icon: "In Progress → In Review · 25m ago" (prototype `statusChange`).

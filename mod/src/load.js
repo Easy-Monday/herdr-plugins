@@ -10,10 +10,25 @@ async function graphql(query, vars) {
   const args = ["api", "graphql", "-f", `query=${query}`];
   for (const [key, value] of Object.entries(vars)) if (value != null) args.push("-f", `${key}=${value}`);
   const result = await gh(args);
+  let json;
+  try {
+    json = JSON.parse(result.stdout);
+  } catch (err) {
+    if (result.code === 0) throw err;
+  }
+  if (partial(json)) return json;
   if (result.code !== 0) throw new Error((result.stderr || result.stdout).trim() || `gh exited with ${result.code}`);
-  const json = JSON.parse(result.stdout);
   if (json.errors?.length) throw new Error(json.errors.map((e) => e.message).join("; "));
   return json;
+}
+
+// An issue also on a board this login can't read: GitHub sends the data, null where that board's
+// fields would be, and FORBIDDEN errors for them (gh exits 1). The parsers skip those nulls, so keep it.
+// Anything else (an error on a root field, a null root, any other error type) is a failed read.
+function partial(json) {
+  const { data, errors } = json ?? {};
+  return Boolean(data) && Object.values(data).every((v) => v != null) &&
+    errors?.length > 0 && errors.every((e) => e.type === "FORBIDDEN" && e.path?.length > 1);
 }
 
 // Every page of a connection. `pick` finds the connection in a response. Stops when GitHub's

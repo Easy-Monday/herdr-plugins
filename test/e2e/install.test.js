@@ -31,6 +31,13 @@ test("should install the prototype copy with the mock layer", () => {
   assert.match(readFileSync(join(dest, "src/mock.js"), "utf8"), /export function mock/);
 });
 
+test("T-2: should install a mod.json with place \"right\" and size 368 when scripts/install.sh runs into an empty HERDR_APP_HOME", () => {
+  const home = mkdtempSync(join(tmpdir(), "herdr-"));
+  const mod = JSON.parse(readFileSync(join(install(home), "mod.json"), "utf8"));
+  assert.equal(mod.place, "right");
+  assert.equal(mod.size, 368);
+});
+
 test("should point icon paths at the installed folder name", () => {
   const home = mkdtempSync(join(tmpdir(), "herdr-"));
   for (const [args, name] of [[[], "project-board"], [["preview"], "project-board-preview"]]) {

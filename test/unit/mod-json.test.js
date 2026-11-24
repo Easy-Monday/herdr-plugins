@@ -2,7 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-test("should ship with place none so installing changes no layout (BRD §4.10)", () => {
+// Story #56 replaces the BRD §4.10 "place none" test: the board docks right on first install.
+test("T-1: should read place \"right\" and size 368 from mod/mod.json", () => {
   const mod = JSON.parse(readFileSync(new URL("../../mod/mod.json", import.meta.url)));
-  assert.equal(mod.place, "none");
+  assert.equal(mod.place, "right");
+  assert.equal(mod.size, 368);
 });

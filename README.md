@@ -46,7 +46,9 @@ herdr-app check ~/.config/herdr-app/mods/project-board
 
 ### Place the panel
 
-The mod ships with `place: none`, so installing it changes no layout. Add it to a layout you own (clone one first: `herdr-app do layout.clone '{"name":"main","as":"my-layout"}'`). The usual spot is the right panel's `panel-body` stack, next to `files` and `changes`, about 368px wide:
+By default the board docks in the right panel, 368px wide: the first time Herdr sees the `project-board` folder, it docks the board into the layout you are looking at (`mod.json` has `"place": "right"` and `"size": 368`). After that your layouts decide, and running the install again doesn't dock it a second time.
+
+To move or remove it, edit a layout you own (clone one first: `herdr-app do layout.clone '{"name":"main","as":"my-layout"}'`): delete the block whose `content.mod` is `project-board` to remove it, or put that block somewhere else to move it. The usual spot is the right panel's `panel-body` stack, next to `files` and `changes`:
 
 ```json
 { "id": "project-board", "type": "block", "content": { "mod": "project-board", "props": { "refreshSeconds": 120 } } }

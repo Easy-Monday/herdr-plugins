@@ -263,3 +263,21 @@ export function SectionLabel(label, count) {
     .child(label)
     .when(count != null, (el) => el.child(div().font_normal().text_color(t.dim).child(String(count))));
 }
+
+// Marks an agent handoff comment, with the accent bar beside it (epic #10 prototype, a28afdf).
+export function HandoffTag(id) {
+  const t = theme();
+  return div()
+    .id(id)
+    .flex_none()
+    .h(18)
+    .px(6)
+    .flex()
+    .items_center()
+    .rounded(4)
+    .bg(tint(t.accent))
+    .text_size(TEXT.caption)
+    .font_medium()
+    .text_color(t.accent)
+    .child("Handoff");
+}

@@ -6,11 +6,11 @@ import { activeSpace } from "./src/repo.js";
 import { detectRepo } from "./src/git.js";
 import { loadProjects, loadItems, loadIssue } from "./src/load.js";
 import { parseIssue } from "./src/issue.js";
-import { mergeActivity, relativeTime, statusLine } from "./src/activity.js";
+import { isHandoff, mergeActivity, relativeTime, statusLine } from "./src/activity.js";
 import { pickProject, parseItems, buildTree, visibleRows, progress } from "./src/board.js";
 import { classifyError } from "./src/errors.js";
 import { refreshSeconds } from "./src/settings.js";
-import { TEXT, Panel, Header, Notice, Busy, Button, IconButton, TextButton, Icon, IssueNumber, StatusPill, Progress, Chevron, Markdown, TypeTag, Message, SectionLabel } from "./ui.js";
+import { TEXT, Panel, Header, Notice, Busy, Button, IconButton, TextButton, Icon, IssueNumber, StatusPill, Progress, Chevron, Markdown, TypeTag, Message, SectionLabel, HandoffTag } from "./ui.js";
 
 const CONTEXT_POLL_MS = 1000;
 
@@ -464,20 +464,27 @@ export default class ProjectBoard extends View {
   }
 
   // Author, relative time, then the body as markdown (from the approved epic #10 prototype, a28afdf,
-  // `comment`, without its handoff tag: #14 marks handoffs here).
+  // `comment`). A handoff gets an accent bar and tag; every comment has the 2px bar, so all text
+  // keeps one left edge (ml(-10) + pl(8) + 2px).
   comment(c, now) {
     const t = theme();
+    const handoff = isHandoff(c.body);
     return v_flex()
       .id(`comment-${c.id}`)
       .flex_none()
       .min_w(0)
       .gap(4)
+      .ml(-10)
+      .pl(8)
+      .border_l(2)
+      .border_color(handoff ? t.accent : t.background)
       .child(
         h_flex()
           .gap(6)
           .items_center()
           .child(div().flex_none().font_medium().text_size(TEXT.small).child(c.author?.login ?? "ghost"))
-          .child(div().flex_1().min_w(0).truncate().text_size(TEXT.caption).text_color(t.dim).child(relativeTime(c.createdAt, now))),
+          .child(div().flex_1().min_w(0).truncate().text_size(TEXT.caption).text_color(t.dim).child(relativeTime(c.createdAt, now)))
+          .when(handoff, (el) => el.child(HandoffTag(`handoff-${c.id}`))),
       )
       .child(Markdown(`comment-body-${c.id}`, c.body || ""));
   }

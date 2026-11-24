@@ -38,3 +38,14 @@ test("T-2: should parse an issue GraphQL response into type, title, number, Stat
   assert.equal(bare.issueType, null);
   assert.equal(bare.status, null);
 });
+
+// Story #44: the timelineItems Status changes, each with its board (`project { id }`).
+test("#44 T-1: should keep only events whose project.id is this board's id when parseIssue(response, projectId) builds the events list", () => {
+  const change = (eventId, projectId) => ({ id: eventId, createdAt: "2026-11-23T10:00:00Z", previousStatus: "Todo", status: "Done", project: { id: projectId } });
+  const issue = parseIssue(response(node({ timelineItems: { nodes: [change("e1", board), change("e2", "PVT_other"), change("e3", board)] } })), board);
+  assert.deepEqual(issue.events.map((e) => e.id), ["e1", "e3"]);
+
+  // All changes on another board: no events.
+  const elsewhere = parseIssue(response(node({ timelineItems: { nodes: [change("e4", "PVT_other")] } })), board);
+  assert.deepEqual(elsewhere.events, []);
+});

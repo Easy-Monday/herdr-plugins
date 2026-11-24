@@ -33,7 +33,7 @@ export function parseIssue(response, projectId) {
       status: statusOn(s.projectItems, projectId),
     })),
     comments: (i.comments?.nodes ?? []).filter(Boolean),
-    // timelineItems holds only Status changes (load.js asks for no other type).
-    events: (i.timelineItems?.nodes ?? []).filter((e) => e?.createdAt),
+    // timelineItems holds only Status changes (load.js asks for no other type); keep this board's.
+    events: (i.timelineItems?.nodes ?? []).filter((e) => e?.createdAt && e.project?.id === projectId),
   };
 }

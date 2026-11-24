@@ -2,7 +2,7 @@
 
 A read-only side panel for [Herdr Desktop](https://github.com/herdrdev/herdr-app) that shows the GitHub project board linked to the repo of your active tab. Follow epics, stories and their sub-issues while agents work, without keeping a browser open beside Herdr. It works with GitHub through the `gh` CLI.
 
-> **Status:** in development and not usable yet. The list below is the scope of the first release, `v0.1.0`.
+> **Status:** `v0.1.0`, the first release.
 
 ## What it shows
 
@@ -10,7 +10,8 @@ A read-only side panel for [Herdr Desktop](https://github.com/herdrdev/herdr-app
 - **Board list:** top-level items in the board's order with their state, `#number`, Status pill and sub-issue progress.
 - **Sub-issues** nest under their parent, at any depth.
 - **Done hidden by default**, with a **Show done** toggle.
-- **Issue detail:** body, sub-issues, comments and Status changes in one timeline, with agent handoff comments highlighted.
+- **Issue detail:** click a row for its body, sub-issues (with Back to the parent), and one timeline of comments and this board's Status changes, with agent handoff comments highlighted.
+- **Images as links:** images in issues and comments show as **Open image** links that open in your browser, since private repos' images need your GitHub login.
 - **Keeps current:** refreshes every 60 seconds (the `refreshSeconds` block prop, see [Place the panel](#place-the-panel)) and on the refresh button, keeping your place.
 
 It never changes anything on GitHub or in git: GraphQL queries only, and read-only git commands.

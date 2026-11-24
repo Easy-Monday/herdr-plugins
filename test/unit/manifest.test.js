@@ -8,7 +8,7 @@ const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8")
 
 // The keys Herdr documents for mod.json (~/.config/herdr-app/AGENTS.md, "Mods").
 // Add a key here only when the PR shows Herdr accepts it (`npm run check` output).
-const ALLOWED_KEYS = ["place", "size", "focusable", "overlay"];
+const ALLOWED_KEYS = ["place", "size", "focusable", "overlay", "title"];
 
 // The README section whose heading names `mod.json`, up to the next heading of the same or a higher level.
 function manifestSection(md) {

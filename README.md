@@ -77,12 +77,13 @@ To try it without changing a layout, open it as a tab: `herdr-app do tab.new '{"
 
 ### `mod.json`
 
-`mod/mod.json` sets two keys. Herdr reads them only the first time it sees the folder:
+`mod/mod.json` sets three keys:
 
-- `place`: `"right"` docks the board in the right panel.
-- `size`: `368` makes it 368px wide.
+- `title`: `"Project Board"` is the mod's name as Herdr shows it. Herdr's own shipped mods set it, but Herdr's `AGENTS.md` doesn't document it.
+- `place`: `"right"` docks the board in the right panel. Herdr reads it only the first time it sees the folder.
+- `size`: `368` makes it 368px wide, also read only the first time.
 
-Herdr also documents `focusable` and `overlay`; this mod uses neither. It has no `title` or `version` key: Herdr documents neither, and the version lives in `package.json`.
+For the other keys Herdr documents, see Herdr's `AGENTS.md` ("Mods"); this mod uses none of them. There is no `version` key: the version lives only in `package.json`.
 
 ## Development
 

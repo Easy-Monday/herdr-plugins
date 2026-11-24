@@ -39,11 +39,12 @@ export async function loadProjects(repo) {
   return { data: { repository: { projectsV2: { nodes } } } };
 }
 
-// One issue's header and body, with its Status on every board (parseIssue picks this board's).
-// shortcut: the first 20 boards an issue is on; page projectItems if issues sit on more.
+// One issue's header, body and sub-issues, each with its Status on every board (parseIssue picks this board's).
+// shortcut: the first 20 boards an issue or sub-issue is on; page projectItems if issues sit on more.
 // shortcut: the latest 100 comments and 100 Status changes; page back if issues get longer threads.
-// From the approved epic #10 prototype (a28afdf); its sub-issues come with #12.
-const ISSUE = `query($id:ID!){node(id:$id){... on Issue{id number title url state stateReason body issueType{name} projectItems(first:20){nodes{project{id} status:fieldValueByName(name:"Status"){... on ProjectV2ItemFieldSingleSelectValue{name color}}}} comments(last:100){nodes{id author{login} createdAt body}} timelineItems(last:100,itemTypes:[PROJECT_V2_ITEM_STATUS_CHANGED_EVENT]){nodes{... on ProjectV2ItemStatusChangedEvent{id createdAt previousStatus status}}}}}}`;
+// From the approved epic #10 prototype (a28afdf).
+const STATUS = `projectItems(first:20){nodes{project{id} status:fieldValueByName(name:"Status"){... on ProjectV2ItemFieldSingleSelectValue{name color}}}}`;
+const ISSUE = `query($id:ID!){node(id:$id){... on Issue{id number title url state stateReason body issueType{name} ${STATUS} subIssues(first:100){nodes{id number title url state stateReason ${STATUS}}} comments(last:100){nodes{id author{login} createdAt body}} timelineItems(last:100,itemTypes:[PROJECT_V2_ITEM_STATUS_CHANGED_EVENT]){nodes{... on ProjectV2ItemStatusChangedEvent{id createdAt previousStatus status}}}}}}`;
 
 export const loadIssue = (id) => graphql(ISSUE, { id });
 

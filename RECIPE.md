@@ -16,8 +16,8 @@ All colours come from `theme()`; text is Herdr's UI font, 13px for body text, 12
   - indented 45px: the Status pill and, when the item has sub-issues, a 64×4px progress bar in `ansi2` on `raised` with the percent closed beside it.
 - **Sub-issue rows**, 28px tall, indented 20px per level: chevron, state icon, title, `#number`, Status pill last.
 - **State icons** as GitHub draws them: open issue `ansi2`, closed `ansi5`, closed as not planned `dim`; pull request open `ansi2`, merged `ansi5`, closed `ansi1`, draft `dim`; draft issue `dim`.
-- **Status pill**: 18px tall, fully rounded, 7px padding, 11px text in the option's colour on that colour at low alpha (`24` hex). GitHub's option colours map to theme colours: gray `muted`, blue `ansi4`, green `ansi2`, yellow `ansi3`, orange halfway between `ansi1` and `ansi3`, red `ansi1`, pink `ansi13`, purple `ansi5`.
-- **Issue detail** (replaces the list): a header row with a back chevron, state icon, the issue type as an outlined tag (Epic, Task, Bug ...), `#number`, Status pill, then refresh and open-on-GitHub icons; the title wraps under it. Below, scrolling with 14px padding and 18px between sections: the body as markdown, **Sub-issues** with their count and 28px rows, then **Activity** with its count: comments (author, relative time like "2h ago", the markdown body) and Status changes as one `dim` 11px line with a 12px board icon, "In Progress → In Review · 25m ago", oldest first. A handoff comment gets a 2px `accent` bar on its left and a small "Handoff" tag.
+- **Status pill**: 18px tall, fully rounded, 7px side padding, 11px text in the option's colour on that colour at low alpha (`24` hex). GitHub's option colours map to theme colours: gray `muted`, blue `ansi4`, green `ansi2`, yellow `ansi3`, orange halfway between `ansi1` and `ansi3`, red `ansi1`, pink `ansi13`, purple `ansi5`.
+- **Issue detail** (replaces the list): a header row with a back chevron, state icon, the issue type as an outlined tag (Epic, Task, Bug ...), `#number`, Status pill, then refresh and open-on-GitHub icons; the title wraps under it. Below, scrolling with 14px side and 12px top and bottom padding, 18px between sections: the body as markdown, **Sub-issues** with their count and 28px rows, then **Activity** with its count: comments (author, relative time like "2h ago", the markdown body) and Status changes as one `dim` 11px line with a 12px board icon, "In Progress → In Review · 25m ago", oldest first. A handoff comment gets a 2px `accent` bar on its left and a small "Handoff" tag.
 - **Notices** fill the panel when there is no board to show: a 24px icon, a title, a short explanation, then a command in a code box and/or buttons (30px, the primary one `solid`). They cover: not a git repo, no GitHub remote, no linked board, more than one linked board (listed by name), git failing, `gh` missing, logged out, missing the `project` scope, any other API error, an empty board, and a board where everything is done.
 
 ## How it behaves
@@ -30,20 +30,20 @@ All colours come from `theme()`; text is Herdr's UI font, 13px for body text, 12
 - **Show done** shows top-level items whose Status is "Done"; off by default. Its state is remembered across restarts (`localStorage`, key `show-done`). Children of an expanded row always show, done or not.
 - **Images** in issue bodies and comments become "Open image: name" links, because private repos' images need a GitHub login the panel doesn't have.
 - **Handoffs**: a comment whose first line starts with `Tests written at ` or `Prototype handoff at ` is marked as a handoff.
-- Rows and buttons highlight with `hover` on mouse-over. There are no keyboard shortcuts.
-- A failed reload keeps what was shown: a board stays, an open issue stays with "Couldn't refresh: ..." and Try again above it.
+- Rows and buttons highlight with `hover` on mouse-over; the primary button ("Try again", "Open on GitHub") dims to 88% opacity instead. There are no keyboard shortcuts.
+- A failed board reload replaces the list with the matching notice ("The board didn't load" with gh's message and Try again, or the gh-missing, logged-out or scope notice), and the header title goes back to "Project Board". An open issue stays: a failed reload of it keeps the last loaded issue, with "Couldn't refresh: ..." and Try again above it.
 
 ## Built from
 
 - One mod folder, `mod/`, installed as `mods/project-board` (`scripts/install.sh` copies it and writes the installed folder name into `src/name.js`, which icon paths use). No layout, no `keys.json`.
 - `mod.json`: `"place": "right"` and `"size": 368` dock it in the right panel at 368px the first time Herdr sees the folder; `"title": "Project Board"` is its name in Herdr.
-- `main.js` exports the View; `ui.js` holds the small components (Panel, Header, IconButton, TextButton, StatusPill, Progress, Chevron, Notice, Button, Markdown, TypeTag, HandoffTag); `src/` holds pure logic (repo detection, board tree, issue parsing, activity, image links, error kinds) and the two modules that run programs.
+- `main.js` exports the View; `ui.js` holds the small components (Icon, Panel, Header, IconButton, TextButton, StatusPill, Progress, Chevron, IssueNumber, Button, Busy, Notice, Markdown, TypeTag, Message, SectionLabel, HandoffTag); `src/` holds pure logic (repo detection, board tree, issue parsing, activity, image links, error kinds) and the two modules that run programs.
 - Block props: `refreshSeconds` (optional).
-- `herdr`: `theme`, `spaces`, `panes`, `props`, `settings`, `checking`, `exec`. gpui-kit `View`, `div`, `svg`; gpui-base `v_flex`, `h_flex`, `ScrollHandle`, `TextView.markdown`. `cx.timer.every`, `cx.spawn`, `cx.notify`, `cx.open_url`.
+- `herdr`: `theme`, `spaces`, `panes`, `props`, `settings`, `checking`, `exec`. gpui-kit `View`, `div`, `svg`; gpui-base `v_flex`, `h_flex`, `ScrollHandle`, `TextView.markdown`. `cx.timer.every`, `cx.spawn`, `cx.notify`, `cx.open_url`, `cx.stop_propagation` (the chevron, so its row doesn't open).
 - Programs it runs, both through `exec`:
   - `git`, read-only (`remote`, `remote get-url`, `symbolic-ref`, `config --get`), in the terminal's folder on the space's machine.
   - `gh api graphql`, queries only (linked boards, board items 100 per page, one issue with its comments and Status changes), on this computer. `src/gh.js` is the only place that calls it.
-- It reaches the network only through `gh`, to GitHub's GraphQL API. It reads no files outside its own folder.
+- It reaches the network only through `gh`, to GitHub's GraphQL API. Links (markdown, open-on-GitHub, "Get GitHub CLI") go to the system browser through `cx.open_url`. It reads no files outside its own folder.
 - Shipped mods it uses: none; it sits in the right panel's stack beside `files` and `changes`.
 - Art: SVG icons in `mod/icons/` from Lucide (ISC license, in that folder).
 
@@ -53,7 +53,7 @@ All colours come from `theme()`; text is Herdr's UI font, 13px for body text, 12
 - It needs the GitHub CLI on this computer, logged in with the `project` scope (`gh auth login -s project`, or `gh auth refresh -s project`). There is no token setting. Without it the panel shows what to run.
 - It is read-only: GraphQL queries and read-only git commands, never a mutation. It can't change Status, comment or edit.
 - What it assumes: a github.com repo (not GitHub Enterprise), exactly one open Projects (v2) board linked to the repo, a single-select field named `Status`, `git` on the machine the space runs on.
-- Limits: per issue, the latest 100 comments and 100 Status changes; 100 sub-issues per item; refresh never faster than 60 seconds. Images are links, not shown inline.
+- Limits: per issue, the latest 100 comments and 100 Status changes; 100 sub-issues per item; an issue's Status is read from the first 20 boards it is on; refresh never faster than 60 seconds. Images are links, not shown inline.
 - Mod rules that a fresh build gets wrong: no `setTimeout` (use `cx.timer`), return after `if (checking()) return;` before any `exec` or timer in `init`, and create `ScrollHandle`s outside `render`.
 
 ## Done when

@@ -249,10 +249,12 @@ export default class ProjectBoard extends View {
 
   // A row, a sub-issue row or a sub-issue in a detail: its detail goes on top of the trail. Pull requests and draft issues
   // only link to GitHub; a draft has no page of its own, so it opens the board's item pane.
+  // From a detail, the board is that detail's: a failed refresh leaves the screen without one.
   openDetail(node, cx) {
     const { project, repo } = this.screen;
+    const from = this.shown();
     const url = node.type === "DraftIssue" && project?.url && node.itemId ? `${project.url}?pane=issue&itemId=${node.itemId}` : node.url;
-    const d = { node: { ...node, url }, repo, projectId: project?.id, data: null, error: null, token: 0 };
+    const d = { node: { ...node, url }, repo: from?.repo ?? repo, projectId: from ? from.projectId : project?.id, data: null, error: null, token: 0 };
     this.trail.push(d);
     if (node.type === "Issue") this.loadDetail(d, cx);
     cx.notify();

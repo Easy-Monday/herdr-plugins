@@ -30,7 +30,8 @@ export function imageLinks(markdown) {
 }
 
 const FENCE = / {0,3}(`{3,}|~{3,})([^\n]*)/y;
-const FENCE_END = / {0,3}(`{3,}|~{3,})[ \t]*(?:\n|$)/y;
+const FENCE_END = / {0,3}(`{3,}|~{3,})[ \t]*\r?(?:\n|$)/y;
+const BLANK = /\n\r?\n/g; // a blank line, with LF or CRLF line endings
 const DEF = / {0,3}\[([^[\]\n]{1,999})\]:[ \t]*(?:<([^<>\n]*)>|(\S+))/y;
 
 // Fenced code blocks and code spans (`code[i]`: one starts at i and ends before code[i]), and the
@@ -76,7 +77,10 @@ function blocks(s) {
     // No run of this length when an escaped backtick shortened it ("\``"): then there's no closer.
     const run = runs.get(j - i) ?? { at: [], next: 0 };
     while (run.at[run.next] <= i) run.next++;
-    if (blank < i) blank = s.indexOf("\n\n", i) < 0 ? n : s.indexOf("\n\n", i);
+    if (blank < i) {
+      BLANK.lastIndex = i;
+      blank = BLANK.exec(s)?.index ?? n;
+    }
     const closer = run.at[run.next];
     if (closer !== undefined && closer < blank) {
       code[i] = closer + j - i;
@@ -155,7 +159,8 @@ function rewrite(s) {
     const k = s[j + 1] === "[" ? close[j + 1] : -1;
     if (k > j + 2) [a, b, end] = [j + 2, k, k + 1];
     else if (k === j + 2) end = k + 1;
-    if (!defs.size || b - a > LABEL_MAX) return null;
+    // A label holds no bracket (nor does a definition's, see DEF), so nested `![` aren't normalised each time.
+    if (!defs.size || b - a > LABEL_MAX || next("[]")[a] < b) return null;
     const url = defs.get(label(s.slice(a, b)));
     return url === undefined ? null : { url, end };
   };

@@ -32,7 +32,7 @@ If `gh` is missing, logged out or lacks the scope, the panel says so and shows w
 
 Copy this prompt into your Herdr agent:
 
-> Read ~/.config/herdr-app/AGENTS.md, then add this mod: https://github.com/Easy-Monday/herdr-plugins (install `mod/` as `~/.config/herdr-app/mods/project-board`), and add it as a panel in the layout's right panel next to Files and Changes, with a "Board" button in the tab bar
+> Read ~/.config/herdr-app/AGENTS.md, then add this mod: https://github.com/Easy-Monday/herdr-plugins (install `mod/` as `~/.config/herdr-app/mods/project-board`), and add it as a panel in the layout's right panel next to Files and Changes, with a "Board" button in the tab bar; if Herdr also docked the board as its own column, remove that column
 
 Herdr has no install command: installing a mod means copying its folder into `~/.config/herdr-app/mods/`, which `scripts/install.sh` does. A new install may need a Herdr restart before the board appears.
 

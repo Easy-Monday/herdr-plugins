@@ -75,6 +75,16 @@ With [Better Tabs](https://github.com/munza/herdr-mods/tree/main/better-tabs), a
 
 To try it without changing a layout, open it as a tab: `herdr-app do tab.new '{"mod":"project-board"}'`.
 
+### `mod.json`
+
+`mod/mod.json` sets three keys:
+
+- `title`: `"Project Board"` is the mod's name as Herdr shows it. Herdr's own shipped mods set it, but Herdr's `AGENTS.md` doesn't document it.
+- `place`: `"right"` docks the board in the right panel. Herdr reads it only the first time it sees the folder.
+- `size`: `368` makes it 368px wide, also read only the first time.
+
+For the other keys Herdr documents, see Herdr's `AGENTS.md` ("Mods"); this mod uses none of them. There is no `version` key: the version lives only in `package.json`.
+
 ## Development
 
 The mod is gpui-kit JavaScript run by Herdr, not Node; Node 26 (`.nvmrc`) runs the tests and scripts. Commands, layout and test approach are in [CLAUDE.md](CLAUDE.md). In short:

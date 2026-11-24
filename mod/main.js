@@ -7,6 +7,7 @@ import { detectRepo } from "./src/git.js";
 import { loadProjects, loadItems, loadIssue } from "./src/load.js";
 import { parseIssue } from "./src/issue.js";
 import { isHandoff, mergeActivity, relativeTime, statusLine } from "./src/activity.js";
+import { imageLinks } from "./src/images.js";
 import { pickProject, parseItems, buildTree, visibleRows, progress } from "./src/board.js";
 import { classifyError } from "./src/errors.js";
 import { refreshSeconds } from "./src/settings.js";
@@ -420,7 +421,7 @@ export default class ProjectBoard extends View {
       .px(14)
       .py(12)
       .gap(18)
-      .child(body.trim() ? Markdown(`body-${key}`, body) : Message("No description."))
+      .child(body.trim() ? Markdown(`body-${key}`, imageLinks(body)) : Message("No description."))
       .when(subIssues.length > 0, (el) =>
         el.child(
           v_flex()
@@ -486,7 +487,7 @@ export default class ProjectBoard extends View {
           .child(div().flex_1().min_w(0).truncate().text_size(TEXT.caption).text_color(t.dim).child(relativeTime(c.createdAt, now)))
           .when(handoff, (el) => el.child(HandoffTag(`handoff-${c.id}`))),
       )
-      .child(Markdown(`comment-body-${c.id}`, c.body || ""));
+      .child(Markdown(`comment-body-${c.id}`, imageLinks(c.body || "")));
   }
 
   // One dim line with the board icon: "In Progress → In Review · 25m ago" (prototype `statusChange`).

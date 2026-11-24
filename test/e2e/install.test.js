@@ -38,6 +38,17 @@ test("T-2: should install a mod.json with place \"right\" and size 368 when scri
   assert.equal(mod.size, 368);
 });
 
+test("T-3 (#59): should leave `RECIPE.md` and `preview.png` out of the folder `scripts/install.sh` installs", () => {
+  const repo = new URL("../..", import.meta.url).pathname;
+  // Herdr says to leave the recipe and preview out of mods/<name>/; both must exist in the repo for this to mean anything.
+  for (const file of ["RECIPE.md", "preview.png"]) assert.ok(existsSync(join(repo, file)), `${file} does not exist at the repo root`);
+  const home = mkdtempSync(join(tmpdir(), "herdr-"));
+  for (const args of [[], ["preview"], ["prototype"]]) {
+    const dest = install(home, ...args);
+    for (const file of ["RECIPE.md", "preview.png"]) assert.ok(!existsSync(join(dest, file)), `${file} was installed into ${dest}`);
+  }
+});
+
 test("should point icon paths at the installed folder name", () => {
   const home = mkdtempSync(join(tmpdir(), "herdr-"));
   for (const [args, name] of [[[], "project-board"], [["preview"], "project-board-preview"]]) {

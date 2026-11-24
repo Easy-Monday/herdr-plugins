@@ -2,6 +2,10 @@
 
 A read-only side panel for [Herdr Desktop](https://github.com/herdrdev/herdr-app) that shows the GitHub project board linked to the repo of your active tab. Follow epics, stories and their sub-issues while agents work, without keeping a browser open beside Herdr. It works with GitHub through the `gh` CLI.
 
+![Project Board](preview.png)
+
+An opened issue looks like [docs/preview-detail.png](docs/preview-detail.png). [RECIPE.md](RECIPE.md) describes the mod for herdr.dev/mods.
+
 > **Status:** `v0.1.0`, the first release.
 
 ## What it shows

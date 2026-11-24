@@ -103,7 +103,7 @@ Show a plain message (and, where useful, what to run) for: folder is not a git r
 ### 4.10 Placement in a Herdr window
 Priority: Must
 Release: MVP
-The mod ships with `"place": "none"`, so installing it changes no one's layout. The README explains how to place it: add a block for it as another child of the right panel's `panel-body` stack in a clone of the `main` layout (next to `files`, `changes` and `pull-requests`), and a **Board** button in a clone of the tab bar, the way Branch PR's PRs button is added (`panelButton(...)`). The owner's own placement (`my-layout`, `my-tabs`) is a local task, not part of the mod. (Changed 2026-11-23: the mod is to be published as open source.)
+The mod's `mod.json` has `"place": "right"` and `"size": 368`, so the first time Herdr sees the mod's folder it docks the board in the right panel, 368px wide; after that the user's layouts decide. The README says how to move or remove it, and how to place it by hand: add a block for it as another child of the right panel's `panel-body` stack in a clone of the `main` layout (next to `files`, `changes` and `pull-requests`), and a **Board** button in a clone of the tab bar, the way Branch PR's PRs button is added (`panelButton(...)`). The owner's own placement (`my-layout`, `my-tabs`) is a local task, not part of the mod. (Changed 2026-11-23: the mod is to be published as open source. Changed 2026-11-24, story #56: docks right on first install instead of `"place": "none"`, at the owner's request.)
 
 ### 4.11 Images in issue bodies and comments as links
 Priority: Must

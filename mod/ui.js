@@ -219,7 +219,7 @@ export function Notice({ id, icon, title, detail, list, command, buttons = [] })
     .when(buttons.length > 0, (el) => el.child(h_flex().gap(8).children(buttons)));
 }
 
-// Markdown, TypeTag and Message follow the approved epic #10 prototype (epic/10-prototype, a28afdf).
+// Markdown, TypeTag, Message and SectionLabel follow the approved epic #10 prototype (epic/10-prototype, a28afdf).
 // Issue markdown; its links open in the system browser.
 export const Markdown = (id, text) =>
   TextView.markdown(id, text)
@@ -249,3 +249,17 @@ export function TypeTag(name) {
 
 export const Message = (text) =>
   div().flex_none().text_size(TEXT.small).text_color(theme().dim).whitespace_normal().child(text);
+
+// A section's name in the detail, with its count beside it ("Activity 8").
+export function SectionLabel(label, count) {
+  const t = theme();
+  return h_flex()
+    .flex_none()
+    .gap(6)
+    .items_center()
+    .text_size(TEXT.small)
+    .font_medium()
+    .text_color(t.muted)
+    .child(label)
+    .when(count != null, (el) => el.child(div().font_normal().text_color(t.dim).child(String(count))));
+}

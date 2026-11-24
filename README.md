@@ -30,6 +30,8 @@ Copy this prompt into your Herdr agent:
 
 > Read ~/.config/herdr-app/AGENTS.md, then add this mod: https://github.com/Easy-Monday/herdr-plugins (install `mod/` as `~/.config/herdr-app/mods/project-board`)
 
+Herdr has no install command: installing a mod means copying its folder into `~/.config/herdr-app/mods/`, which `scripts/install.sh` does. Once the folder is there, the board appears in the right panel ([Place the panel](#place-the-panel)).
+
 <details>
 <summary>Install by hand</summary>
 

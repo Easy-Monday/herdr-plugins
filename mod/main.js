@@ -6,11 +6,11 @@ import { activeSpace } from "./src/repo.js";
 import { detectRepo } from "./src/git.js";
 import { loadProjects, loadItems, loadIssue } from "./src/load.js";
 import { parseIssue } from "./src/issue.js";
-import { mergeActivity, relativeTime, statusLine } from "./src/activity.js";
+import { isHandoff, mergeActivity, relativeTime, statusLine } from "./src/activity.js";
 import { pickProject, parseItems, buildTree, visibleRows, progress } from "./src/board.js";
 import { classifyError } from "./src/errors.js";
 import { refreshSeconds } from "./src/settings.js";
-import { TEXT, Panel, Header, Notice, Busy, Button, IconButton, TextButton, Icon, IssueNumber, StatusPill, Progress, Chevron, Markdown, TypeTag, Message, SectionLabel } from "./ui.js";
+import { TEXT, Panel, Header, Notice, Busy, Button, IconButton, TextButton, Icon, IssueNumber, StatusPill, Progress, Chevron, Markdown, TypeTag, Message, SectionLabel, HandoffTag } from "./ui.js";
 
 const CONTEXT_POLL_MS = 1000;
 
@@ -168,8 +168,9 @@ export default class ProjectBoard extends View {
     this.screen = { kind: "loading" };
     this.loading = true;
     this.token = 0;
-    // The open issue's detail, shown in place of the list; null shows the list.
-    this.detail = null;
+    // Open details, the shown one last, in place of the list; empty shows the list. Back goes one
+    // step up the trail (sub-issue, parent, list). Each entry keeps its own state (data, token).
+    this.trail = [];
     if (checking()) return;
     this.followFocus(cx);
     cx.timer.every(CONTEXT_POLL_MS, (cx) => this.followFocus(cx));
@@ -213,7 +214,7 @@ export default class ProjectBoard extends View {
         // Another repo: its board as it was left, else the repo while gh reads its boards,
         // never the previous repo's board.
         if (token === this.token && this.screen.repo !== screen.repo) {
-          this.detail = null;
+          this.trail = [];
           this.screen = this.board(screen.repo).screen ?? { kind: "loading", repo: screen.repo, folder: sp.folder };
           cx.notify();
         }
@@ -221,7 +222,7 @@ export default class ProjectBoard extends View {
       }
       if (token !== this.token) return;
       // A detail stays open over its own repo's board only (a failed refresh keeps it).
-      if (this.detail?.repo !== screen.repo) this.detail = null;
+      if (this.trail[0]?.repo !== screen.repo) this.trail = [];
       this.screen = { ...screen, folder: sp?.folder ?? null };
       if (screen.kind === "board") this.board(screen.repo).screen = this.screen;
       this.loading = false;
@@ -241,18 +242,26 @@ export default class ProjectBoard extends View {
     cx.notify();
   }
 
-  // A row or sub-issue row: the list makes way for its detail. Pull requests and draft issues
+  // The detail on top of the trail; null shows the list.
+  shown() {
+    return this.trail[this.trail.length - 1] ?? null;
+  }
+
+  // A row, a sub-issue row or a sub-issue in a detail: its detail goes on top of the trail. Pull requests and draft issues
   // only link to GitHub; a draft has no page of its own, so it opens the board's item pane.
+  // From a detail, the board is that detail's: a failed refresh leaves the screen without one.
   openDetail(node, cx) {
     const { project, repo } = this.screen;
+    const from = this.shown();
     const url = node.type === "DraftIssue" && project?.url && node.itemId ? `${project.url}?pane=issue&itemId=${node.itemId}` : node.url;
-    this.detail = { node: { ...node, url }, repo, projectId: project?.id, data: null, error: null, token: 0 };
-    if (node.type === "Issue") this.loadDetail(this.detail, cx);
+    const d = { node: { ...node, url }, repo: from?.repo ?? repo, projectId: from ? from.projectId : project?.id, data: null, error: null, token: 0 };
+    this.trail.push(d);
+    if (node.type === "Issue") this.loadDetail(d, cx);
     cx.notify();
   }
 
   back(cx) {
-    this.detail = null;
+    this.trail.pop();
     cx.notify();
   }
 
@@ -276,7 +285,8 @@ export default class ProjectBoard extends View {
   }
 
   render() {
-    if (this.detail) return Panel("project-board").child(this.detailHeader(this.detail)).child(this.detailBody(this.detail));
+    const shown = this.shown();
+    if (shown) return Panel("project-board").child(this.detailHeader(shown)).child(this.detailBody(shown));
     const s = this.screen;
     const tryAgain = Button({ id: "try-again", label: "Try again", primary: true, onClick: (cx) => this.load(cx) });
     const notice = NOTICES[s.kind]?.(s, tryAgain);
@@ -340,6 +350,7 @@ export default class ProjectBoard extends View {
     const t = theme();
     const issue = d.data ?? d.node;
     const [icon, color, label] = stateIcon(issue, t);
+    const above = this.trail[this.trail.length - 2];
     return v_flex()
       .id("detail-header")
       .flex_none()
@@ -353,7 +364,14 @@ export default class ProjectBoard extends View {
         h_flex()
           .gap(6)
           .items_center()
-          .child(IconButton({ id: "back", icon: "chevron-left", label: "Back to the board", onClick: (cx) => this.back(cx) }))
+          .child(
+            IconButton({
+              id: "back",
+              icon: "chevron-left",
+              label: above?.node.number != null ? `Back to #${above.node.number}` : "Back to the board",
+              onClick: (cx) => this.back(cx),
+            }),
+          )
           .child(Icon(icon, 15).text_color(color).accessibility_label(label))
           .when(Boolean(issue.issueType), (el) => el.child(TypeTag(issue.issueType)))
           .when(issue.number != null, (el) => el.child(IssueNumber(issue.number)))
@@ -366,7 +384,7 @@ export default class ProjectBoard extends View {
       .child(div().pl(53).pr(4).font_medium().whitespace_normal().child(issue.title));
   }
 
-  // The issue's body, then its activity (#13); sub-issues (#12) go between them.
+  // The issue's body, its sub-issues (#12), then its activity (#13).
   detailBody(d) {
     if (d.node.type !== "Issue") {
       const pr = d.node.type === "PullRequest";
@@ -391,7 +409,7 @@ export default class ProjectBoard extends View {
         buttons: [Button({ id: "detail-try-again", label: "Try again", primary: true, onClick: (cx) => this.loadDetail(d, cx) })],
       });
     if (!d.data) return Busy(`Loading #${d.node.number}…`, "detail-loading");
-    const { key, body, comments, events } = d.data;
+    const { key, body, subIssues, comments, events } = d.data;
     const activity = mergeActivity(comments, events);
     const now = Date.now();
     return v_flex()
@@ -403,6 +421,16 @@ export default class ProjectBoard extends View {
       .py(12)
       .gap(18)
       .child(body.trim() ? Markdown(`body-${key}`, body) : Message("No description."))
+      .when(subIssues.length > 0, (el) =>
+        el.child(
+          v_flex()
+            .id("sub-issues")
+            .flex_none()
+            .gap(4)
+            .child(SectionLabel("Sub-issues", subIssues.length))
+            .child(v_flex().mx(-6).children(subIssues.map((s) => this.subRow(s)))),
+        ),
+      )
       .child(
         v_flex()
           .id("activity")
@@ -414,21 +442,49 @@ export default class ProjectBoard extends View {
       );
   }
 
+  // State icon, title, #number, Status; a click opens its detail (approved epic #10 prototype, a28afdf, `subRow`).
+  subRow(s) {
+    const t = theme();
+    const [icon, color, label] = stateIcon(s, t);
+    return h_flex()
+      .id(`sub-${s.key}`)
+      .flex_none()
+      .h(28)
+      .px(6)
+      .gap(6)
+      .items_center()
+      .rounded(6)
+      .cursor_pointer()
+      .hover((st) => st.bg(t.hover))
+      .on_click((_e, cx) => this.openDetail(s, cx))
+      .child(Icon(icon, 15).text_color(color).accessibility_label(label))
+      .child(div().flex_1().min_w(0).truncate().child(s.title))
+      .child(IssueNumber(s.number))
+      .when(Boolean(s.status), (el) => el.child(StatusPill(s.status)));
+  }
+
   // Author, relative time, then the body as markdown (from the approved epic #10 prototype, a28afdf,
-  // `comment`, without its handoff tag: #14 marks handoffs here).
+  // `comment`). A handoff gets an accent bar and tag; every comment has the 2px bar, so all text
+  // keeps one left edge (ml(-10) + pl(8) + 2px).
   comment(c, now) {
     const t = theme();
+    const handoff = isHandoff(c.body);
     return v_flex()
       .id(`comment-${c.id}`)
       .flex_none()
       .min_w(0)
       .gap(4)
+      .ml(-10)
+      .pl(8)
+      .border_l(2)
+      .border_color(handoff ? t.accent : t.background)
       .child(
         h_flex()
           .gap(6)
           .items_center()
           .child(div().flex_none().font_medium().text_size(TEXT.small).child(c.author?.login ?? "ghost"))
-          .child(div().flex_1().min_w(0).truncate().text_size(TEXT.caption).text_color(t.dim).child(relativeTime(c.createdAt, now))),
+          .child(div().flex_1().min_w(0).truncate().text_size(TEXT.caption).text_color(t.dim).child(relativeTime(c.createdAt, now)))
+          .when(handoff, (el) => el.child(HandoffTag(`handoff-${c.id}`))),
       )
       .child(Markdown(`comment-body-${c.id}`, c.body || ""));
   }

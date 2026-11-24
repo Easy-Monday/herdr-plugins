@@ -32,9 +32,9 @@ If `gh` is missing, logged out or lacks the scope, the panel says so and shows w
 
 Copy this prompt into your Herdr agent:
 
-> Read ~/.config/herdr-app/AGENTS.md, then add this mod: https://github.com/Easy-Monday/herdr-plugins (install `mod/` as `~/.config/herdr-app/mods/project-board`)
+> Read ~/.config/herdr-app/AGENTS.md, then add this mod: https://github.com/Easy-Monday/herdr-plugins (install `mod/` as `~/.config/herdr-app/mods/project-board`), and add it as a panel in the layout's right panel next to Files and Changes, with a "Board" button in the tab bar
 
-Herdr has no install command: installing a mod means copying its folder into `~/.config/herdr-app/mods/`, which `scripts/install.sh` does. Once the folder is there, the board appears in the right panel ([Place the panel](#place-the-panel)).
+Herdr has no install command: installing a mod means copying its folder into `~/.config/herdr-app/mods/`, which `scripts/install.sh` does. A new install may need a Herdr restart before the board appears.
 
 <details>
 <summary>Install by hand</summary>
@@ -48,11 +48,13 @@ herdr-app check ~/.config/herdr-app/mods/project-board
 
 `scripts/install.sh` needs only standard Unix tools (`sh`, `tar`, `find`, `cp`). It doesn't edit layouts or keys. Run it again after pulling a new version. `HERDR_APP_HOME` installs into another Herdr home.
 
+A by-hand install docks the board as its own column on the right (`place: right`, 368px wide). To move it into the right panel's stack next to Files and Changes, see [Place the panel](#place-the-panel).
+
 </details>
 
 ### Place the panel
 
-By default the board docks in the right panel, 368px wide: the first time Herdr sees the `project-board` folder, it docks the board into the layout you are looking at (`mod.json` has `"place": "right"` and `"size": 368`). After that your layouts decide, and running the install again doesn't dock it a second time.
+By default the board docks as its own column on the right, 368px wide: the first time Herdr sees the `project-board` folder, it docks the board into the layout you are looking at (`mod.json` has `"place": "right"` and `"size": 368`). After that your layouts decide, and running the install again doesn't dock it a second time.
 
 To move or remove it, edit a layout you own (clone one first: `herdr-app do layout.clone '{"name":"main","as":"my-layout"}'`): delete the block whose `content.mod` is `project-board` to remove it, or put that block somewhere else to move it. The usual spot is the right panel's `panel-body` stack, next to `files` and `changes`:
 
@@ -86,7 +88,7 @@ To try it without changing a layout, open it as a tab: `herdr-app do tab.new '{"
 `mod/mod.json` sets three keys:
 
 - `title`: `"Project Board"` is the mod's name as Herdr shows it. Herdr's own shipped mods set it, but Herdr's `AGENTS.md` doesn't document it.
-- `place`: `"right"` docks the board in the right panel. Herdr reads it only the first time it sees the folder.
+- `place`: `"right"` docks the board as its own column on the right. Herdr reads it only the first time it sees the folder.
 - `size`: `368` makes it 368px wide, also read only the first time.
 
 For the other keys Herdr documents, see Herdr's `AGENTS.md` ("Mods"); this mod uses none of them. There is no `version` key: the version lives only in `package.json`.

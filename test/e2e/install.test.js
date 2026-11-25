@@ -49,6 +49,20 @@ test("T-3 (#59): should leave `RECIPE.md` and `preview.png` out of the folder `s
   }
 });
 
+test("T-2 (#67): should install `main.js` and `mod.json` under `mods/project-board`, `mods/project-board-preview` and `mods/project-board-prototype`, with `src/name.js` naming each folder, when `scripts/install.sh` runs into an empty `HERDR_APP_HOME`", () => {
+  const source = new URL("../../mods/project-board/", import.meta.url).pathname;
+  for (const [args, name] of [[[], "project-board"], [["preview"], "project-board-preview"], [["prototype"], "project-board-prototype"]]) {
+    const home = mkdtempSync(join(tmpdir(), "herdr-"));
+    const dest = install(home, ...args);
+    assert.equal(dest, join(home, "mods", name));
+    for (const file of ["main.js", "mod.json"]) {
+      assert.ok(existsSync(join(source, file)), `mods/project-board/${file} does not exist in the repo`);
+      assert.equal(readFileSync(join(dest, file), "utf8"), readFileSync(join(source, file), "utf8"), `${file} in ${dest} is not the one from mods/project-board/`);
+    }
+    assert.equal(readFileSync(join(dest, "src/name.js"), "utf8"), `export const MOD = "${name}";\n`);
+  }
+});
+
 test("should point icon paths at the installed folder name", () => {
   const home = mkdtempSync(join(tmpdir(), "herdr-"));
   for (const [args, name] of [[[], "project-board"], [["preview"], "project-board-preview"]]) {

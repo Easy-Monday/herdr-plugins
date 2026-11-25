@@ -54,7 +54,7 @@ export async function mount(props = {}) {
   herdrStub.props = props;
   timers.length = 0;
   now = 0;
-  const { default: Mod } = await import("../../mod/main.js");
+  const { default: Mod } = await import("../../mods/project-board/main.js");
   const view = new Mod();
   await view.init?.(props, cx);
   return { view, render: () => view.render(cx) };

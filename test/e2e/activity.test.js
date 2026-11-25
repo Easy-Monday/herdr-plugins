@@ -1,5 +1,5 @@
 // Story #13: the issue detail's Activity, comments and board Status changes oldest first
-// (epic #10 prototype a28afdf: mod/main.js `comment`, `statusChange`; mod/src/load.js ISSUE).
+// (epic #10 prototype a28afdf: mods/project-board/main.js `comment`, `statusChange`; mods/project-board/src/load.js ISSUE).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";

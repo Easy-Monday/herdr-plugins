@@ -1,5 +1,5 @@
 // GitHub's answers to the board items query, in the shape of the epic #1 prototype's query
-// (cac901d, mod/src/load.js): `node(id){... on ProjectV2{items(first:100,after){pageInfo nodes}}}`,
+// (cac901d, mods/project-board/src/load.js): `node(id){... on ProjectV2{items(first:100,after){pageInfo nodes}}}`,
 // each item with `status` (the Status field's single-select value: name and option colour)
 // and `content` (an Issue, PullRequest or DraftIssue). Plain data, no Herdr: unit and e2e use it.
 
@@ -12,7 +12,7 @@ export const issue = ({ id, number, title, state = "OPEN", stateReason = null, s
   content: { __typename: "Issue", id, number, title, state, stateReason, subIssuesSummary: summary, subIssues: { nodes: subIssues } },
 });
 
-// One node of an issue's `subIssues` list, in the prototype's shape (cac901d, mod/src/load.js `SUB`):
+// One node of an issue's `subIssues` list, in the prototype's shape (cac901d, mods/project-board/src/load.js `SUB`):
 // the sub-issue itself, with no Status (a board field) and no sub-issue list of its own.
 export const subIssue = ({ id, number, title, state = "OPEN", stateReason = null, summary = NO_SUB_ISSUES }) => ({
   id,

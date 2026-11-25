@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { herdrStub, mount, settle, tick, text } from "../support/harness.js";
-import { loadIssue } from "../../mod/src/load.js";
+import { loadIssue } from "../../mods/project-board/src/load.js";
 
 const DENIED = "Resource not accessible by integration";
 const node = { id: "I_1", number: 11, projectItems: { nodes: [{ project: { id: "PVT_this" } }, { project: null }] } };

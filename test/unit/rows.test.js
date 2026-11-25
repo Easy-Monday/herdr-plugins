@@ -1,10 +1,10 @@
-// Story #5: board items as list rows (pure parts of mod/src/board.js).
+// Story #5: board items as list rows (pure parts of mods/project-board/src/board.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { issue, pullRequest, draftIssue, itemsPage } from "../support/items.js";
 
 // Imported per test, so each T-line reports its own result.
-const board = () => import("../../mod/src/board.js");
+const board = () => import("../../mods/project-board/src/board.js");
 const pick = (row, keys) => Object.fromEntries(keys.map((k) => [k, row[k]]));
 
 test("T-1: should parse a paginated items response into rows in board order with state, title, number and Status", async () => {

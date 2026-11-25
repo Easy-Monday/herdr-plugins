@@ -16,5 +16,5 @@ Branch PR follow, verbatim:
   agent actions, and tests. Its bundled UI SVG icons are adapted from Herdr
   Desktop's icon set.
 
-The icons in mod/icons are from Lucide (https://lucide.dev); their licence is in
-mod/icons/LICENSE.
+The icons in mods/project-board/icons are from Lucide (https://lucide.dev);
+their licence is in mods/project-board/icons/LICENSE.

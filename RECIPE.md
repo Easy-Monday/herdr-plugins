@@ -35,7 +35,7 @@ All colours come from `theme()`; text is Herdr's UI font, 13px for body text, 12
 
 ## Built from
 
-- One mod folder, `mod/`, installed as `mods/project-board` (`scripts/install.sh` copies it and writes the installed folder name into `src/name.js`, which icon paths use). No layout, no `keys.json`.
+- One mod folder, `mods/project-board/`, installed as `~/.config/herdr-app/mods/project-board` (`scripts/install.sh` copies it and writes the installed folder name into `src/name.js`, which icon paths use). No layout, no `keys.json`.
 - `mod.json`: `"place": "right"` and `"size": 368` dock it as its own column on the right, 368px wide, the first time Herdr sees the folder; `"title": "Project Board"` is its name in Herdr.
 - `main.js` exports the View; `ui.js` holds the small components (Icon, Panel, Header, IconButton, TextButton, StatusPill, Progress, Chevron, IssueNumber, Button, Busy, Notice, Markdown, TypeTag, Message, SectionLabel, HandoffTag); `src/` holds pure logic (repo detection, board tree, issue parsing, activity, image links, error kinds) and the two modules that run programs.
 - Block props: `refreshSeconds` (optional).
@@ -45,7 +45,7 @@ All colours come from `theme()`; text is Herdr's UI font, 13px for body text, 12
   - `gh api graphql`, queries only (linked boards, board items 100 per page, one issue with its comments and Status changes), on this computer. `src/gh.js` is the only place that calls it.
 - It reaches the network only through `gh`, to GitHub's GraphQL API. Links (markdown, open-on-GitHub, "Get GitHub CLI") go to the system browser through `cx.open_url`. It reads no files outside its own folder.
 - Shipped mods it uses: none; moved into the right panel's stack, it sits beside `files` and `changes`.
-- Art: SVG icons in `mod/icons/` from Lucide (ISC license, in that folder).
+- Art: SVG icons in `mods/project-board/icons/` from Lucide (ISC license, in that folder).
 
 ## Watch out
 

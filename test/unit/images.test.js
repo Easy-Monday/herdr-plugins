@@ -1,8 +1,8 @@
 // Story #15: images in issue markdown become Open image links (BRD §4.11; epic #10 prototype
-// a28afdf, mod/src/images.js `imageLinks`): labelled by alt text, else the image's file name.
+// a28afdf, mods/project-board/src/images.js `imageLinks`): labelled by alt text, else the image's file name.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { imageLinks } from "../../mod/src/images.js";
+import { imageLinks } from "../../mods/project-board/src/images.js";
 
 // Sha-pinned raw URLs, the way agents post screenshots of the private repo.
 const raw = (sha, file) => `https://github.com/own/web/blob/${sha}/docs/screenshots/15/${file}?raw=true`;

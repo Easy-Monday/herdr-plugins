@@ -1,10 +1,10 @@
-// Bug #52 (release scan F1, CWE-1333): `imageLinks` (mod/src/images.js) must cost time linear in the
+// Bug #52 (release scan F1, CWE-1333): `imageLinks` (mods/project-board/src/images.js) must cost time linear in the
 // body. 65,536 characters is GitHub's limit for an issue or comment body. The regexes it replaces take
 // 170–910 ms on these bodies on the dev machine; a linear pass takes a few ms. The 50 ms bound leaves
 // a wide margin for a slower CI runner either way.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { imageLinks } from "../../mod/src/images.js";
+import { imageLinks } from "../../mods/project-board/src/images.js";
 
 const SIZE = 65_536;
 const BOUND_MS = 50;

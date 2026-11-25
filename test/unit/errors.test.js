@@ -1,7 +1,7 @@
 // Story #4: what a failed gh call means (pure parts). Messages are what gh and Herdr's exec give.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { classifyError } from "../../mod/src/errors.js";
+import { classifyError } from "../../mods/project-board/src/errors.js";
 
 test("T-1: should classify an exec ENOENT for gh as `gh-missing`", () => {
   // Herdr's exec rejects when the program can't start (herdr.d.ts `exec`).

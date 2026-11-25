@@ -10,8 +10,8 @@
   "scripts": {
     "test": "node --test 'test/unit/**/*.test.js'; u=$?; node --import ./test/support/register.mjs --test 'test/e2e/**/*.test.js'; e=$?; exit $((u | e))",
     "test:file": "node --import ./test/support/register.mjs --test",
-    "lint": "find mod mock scripts test \\( -name '*.js' -o -name '*.mjs' \\) -print0 | xargs -0 -n1 node --check && sh -n scripts/install.sh",
-    "check": "herdr-app check mod",
+    "lint": "find mods/project-board mock scripts test \\( -name '*.js' -o -name '*.mjs' \\) -print0 | xargs -0 -n1 node --check && sh -n scripts/install.sh",
+    "check": "herdr-app check mods/project-board",
     "audit": "test ! -e .nsprc.js && test ! -e .nsprc.cjs && cp config/audit-allowlist.json .nsprc && better-npm-audit audit --package-manager npm --production -l high --require-notes --require-expiry",
     "install-mod": "scripts/install.sh",
     "preview": "scripts/install.sh preview",

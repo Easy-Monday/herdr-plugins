@@ -1,8 +1,8 @@
 // Story #11: an issue's detail header, read from GitHub's answer to the issue query
-// (epic #10 prototype a28afdf, mod/src/load.js ISSUE: issueType, projectItems with each board's Status).
+// (epic #10 prototype a28afdf, mods/project-board/src/load.js ISSUE: issueType, projectItems with each board's Status).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseIssue } from "../../mod/src/issue.js";
+import { parseIssue } from "../../mods/project-board/src/issue.js";
 
 const board = "PVT_this";
 const onBoard = (projectId, status) => ({ project: { id: projectId }, status });

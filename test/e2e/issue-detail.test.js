@@ -22,7 +22,7 @@ function itemsAnswer(q, nodes) {
 }
 const issueAnswer = (q, node) => ({ data: { node: Object.fromEntries(Object.entries(node).filter(([k]) => k === "id" || asks(q, k))) } });
 
-// The issue query's answer for one issue, in the prototype's shape (a28afdf, mod/src/load.js ISSUE).
+// The issue query's answer for one issue, in the prototype's shape (a28afdf, mods/project-board/src/load.js ISSUE).
 const detail = ({ id, number, title, url, body = "", issueType = null, projectId, status = null }) => ({
   id,
   number,

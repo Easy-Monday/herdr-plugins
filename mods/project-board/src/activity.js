@@ -1,5 +1,5 @@
 // An issue's activity: comments and board Status changes in one list, as plain functions.
-// From the approved epic #10 prototype (epic/10-prototype, a28afdf, mod/src/activity.js).
+// From the approved epic #10 prototype (epic/10-prototype, a28afdf, mods/project-board/src/activity.js).
 // relativeTime adapted from Branch PR (munza/herdr-mods, Apache-2.0).
 
 // The first lines of the project-plugin's agent handoffs (branch-and-flag-policy). Authorship

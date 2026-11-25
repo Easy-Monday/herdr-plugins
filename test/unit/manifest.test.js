@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 // Story #58.
-const mod = JSON.parse(readFileSync(new URL("../../mod/mod.json", import.meta.url), "utf8"));
+const mod = JSON.parse(readFileSync(new URL("../../mods/project-board/mod.json", import.meta.url), "utf8"));
 const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
 
 // The keys Herdr documents for mod.json (~/.config/herdr-app/AGENTS.md, "Mods").
@@ -24,12 +24,12 @@ function manifestSection(md) {
   return (end === -1 ? rest : rest.slice(0, end)).join("\n");
 }
 
-test("T-1: should hold only keys from a named allowlist in mod/mod.json, the allowlist being the documented keys plus any the PR confirms Herdr accepts", () => {
+test("T-1: should hold only keys from a named allowlist in mods/project-board/mod.json, the allowlist being the documented keys plus any the PR confirms Herdr accepts", () => {
   const extra = Object.keys(mod).filter((k) => !ALLOWED_KEYS.includes(k));
-  assert.deepEqual(extra, [], `mod/mod.json keys not in ALLOWED_KEYS: ${extra.join(", ")}`);
+  assert.deepEqual(extra, [], `mods/project-board/mod.json keys not in ALLOWED_KEYS: ${extra.join(", ")}`);
 });
 
-test("T-2: should find every key of mod/mod.json named in the README manifest section", () => {
+test("T-2: should find every key of mods/project-board/mod.json named in the README manifest section", () => {
   const section = manifestSection(readme);
   assert.ok(section !== null, "README has no heading that names mod.json");
   const missing = Object.keys(mod).filter((k) => !section.includes(`\`${k}\``));

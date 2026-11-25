@@ -4,5 +4,5 @@
 .nsprc
 node_modules/
 # written by Herdr into a mod folder
-mod/jsconfig.json
-mod/*.d.ts
+mods/project-board/jsconfig.json
+mods/project-board/*.d.ts

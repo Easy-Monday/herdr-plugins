@@ -1,4 +1,4 @@
-// Story #5: Status pill colours (mod/src/status.js).
+// Story #5: Status pill colours (mods/project-board/src/status.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -14,7 +14,7 @@ const theme = {
 };
 
 test("T-2: should map a GitHub option colour name to a pill colour and fall back to a theme colour when absent", async () => {
-  const { statusColor } = await import("../../mod/src/status.js");
+  const { statusColor } = await import("../../mods/project-board/src/status.js");
   // GitHub's single-select option colours, as the approved prototype shows them (epic #1, cac901d).
   assert.equal(statusColor("GRAY", theme), theme.muted);
   assert.equal(statusColor("BLUE", theme), theme.ansi4);

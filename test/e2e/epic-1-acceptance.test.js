@@ -347,7 +347,7 @@ const herdrApp = (() => {
 })();
 
 test("T-5: should pass `herdr-app check` on the mod folder (runs only where herdr-app is on PATH, skipped in CI)", { skip: !herdrApp && "herdr-app is not on PATH" }, () => {
-  const mod = new URL("../../mod", import.meta.url).pathname;
+  const mod = new URL("../../mods/project-board", import.meta.url).pathname;
   const out = execFileSync("herdr-app", ["check", mod], { encoding: "utf8" });
   assert.match(out, /check passed/);
 });

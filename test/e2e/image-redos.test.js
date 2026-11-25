@@ -1,5 +1,5 @@
 // Bug #52 (release scan F1): a 65,536-character comment of `![` froze the panel on every redraw of the
-// issue's detail (mod/main.js renders bodies through `imageLinks`). The detail must keep redrawing fast
+// issue's detail (mods/project-board/main.js renders bodies through `imageLinks`). The detail must keep redrawing fast
 // and still show the comment. Today each redraw takes about 0.9 s on the dev machine.
 import { test } from "node:test";
 import assert from "node:assert/strict";

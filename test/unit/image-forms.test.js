@@ -1,9 +1,9 @@
-// Bug #49: `imageLinks` (mod/src/images.js, story #15) must turn every image form GitHub renders
+// Bug #49: `imageLinks` (mods/project-board/src/images.js, story #15) must turn every image form GitHub renders
 // into an Open image link (BRD §4.11), leave code spans and fenced code blocks as written, and take
 // an <img>'s URL from its real src. Forms from the PR #48 review.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { imageLinks } from "../../mod/src/images.js";
+import { imageLinks } from "../../mods/project-board/src/images.js";
 
 const url = (file) => `https://github.com/own/web/blob/2c4d8e0/docs/screenshots/49/${file}?raw=true`;
 

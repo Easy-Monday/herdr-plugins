@@ -32,7 +32,7 @@ If `gh` is missing, logged out or lacks the scope, the panel says so and shows w
 
 Copy this prompt into your Herdr agent:
 
-> Read ~/.config/herdr-app/AGENTS.md, then add this mod: https://github.com/Easy-Monday/herdr-plugins (install `mod/` as `~/.config/herdr-app/mods/project-board`), and add it as a panel in the layout's right panel next to Files and Changes, with a "Board" button in the tab bar; if Herdr also docked the board as its own column, remove that column
+> Read ~/.config/herdr-app/AGENTS.md, then add this mod: https://github.com/Easy-Monday/herdr-plugins (install `mods/project-board/` as `~/.config/herdr-app/mods/project-board`), and add it as a panel in the layout's right panel next to Files and Changes, with a "Board" button in the tab bar; if Herdr also docked the board as its own column, remove that column
 
 Herdr has no install command: installing a mod means copying its folder into `~/.config/herdr-app/mods/`, which `scripts/install.sh` does. A new install may need a Herdr restart before the board appears.
 
@@ -42,7 +42,7 @@ Herdr has no install command: installing a mod means copying its folder into `~/
 ```sh
 git clone https://github.com/Easy-Monday/herdr-plugins.git
 cd herdr-plugins
-scripts/install.sh            # copies mod/ to ~/.config/herdr-app/mods/project-board
+scripts/install.sh            # copies mods/project-board/ to ~/.config/herdr-app/mods/project-board
 herdr-app check ~/.config/herdr-app/mods/project-board
 ```
 
@@ -85,7 +85,7 @@ To try it without changing a layout, open it as a tab: `herdr-app do tab.new '{"
 
 ### `mod.json`
 
-`mod/mod.json` sets three keys:
+`mods/project-board/mod.json` sets three keys:
 
 - `title`: `"Project Board"` is the mod's name as Herdr shows it. Herdr's own shipped mods set it, but Herdr's `AGENTS.md` doesn't document it.
 - `place`: `"right"` docks the board as its own column on the right. Herdr reads it only the first time it sees the folder.
@@ -101,7 +101,7 @@ The mod is gpui-kit JavaScript run by Herdr, not Node; Node 26 (`.nvmrc`) runs t
 npm ci
 npm test              # unit and e2e (Herdr runtime stubbed)
 npm run lint
-npm run check         # herdr-app check mod (needs Herdr)
+npm run check         # herdr-app check mods/project-board (needs Herdr)
 npm run preview       # install this checkout as project-board-preview
 ```
 

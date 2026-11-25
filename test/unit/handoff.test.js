@@ -1,8 +1,8 @@
 // Story #14: agent handoff comments, told by their first line (BRD §4.7; epic #10 prototype
-// a28afdf, mod/src/activity.js `isHandoff`). Authorship can't be used: all agents post as one user.
+// a28afdf, mods/project-board/src/activity.js `isHandoff`). Authorship can't be used: all agents post as one user.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isHandoff } from "../../mod/src/activity.js";
+import { isHandoff } from "../../mods/project-board/src/activity.js";
 
 test("T-1: should return true for bodies whose first line starts with either prefix", () => {
   assert.equal(isHandoff("Tests written at 9f3c2e1 on story/11-open-an-issue-s-detail"), true);

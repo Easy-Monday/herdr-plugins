@@ -1,5 +1,5 @@
 // Story #16: an open issue detail reloads on the board's refresh cycle and keeps its place
-// (epic #10 prototype a28afdf: mod/main.js `loadDetail`, the REFRESH_MS timer, `detailBody`'s
+// (epic #10 prototype a28afdf: mods/project-board/main.js `loadDetail`, the REFRESH_MS timer, `detailBody`'s
 // `track_scroll(d.scroll)`). The scroll offset: Herdr keeps it in the ScrollHandle the detail's
 // scroll area tracks, one per detail as in the prototype; the stub handle's `offset` stands in for it.
 import { test } from "node:test";

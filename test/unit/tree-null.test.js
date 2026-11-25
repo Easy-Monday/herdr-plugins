@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { issue, subIssue, itemsPage } from "../support/items.js";
-import { parseItems, buildTree } from "../../mod/src/board.js";
+import { parseItems, buildTree } from "../../mods/project-board/src/board.js";
 
 test("should skip null sub-issue entries when building the tree", () => {
   const items = parseItems([

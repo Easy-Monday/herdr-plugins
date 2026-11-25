@@ -1,8 +1,8 @@
 // Story #12: an issue's sub-issues, read from GitHub's answer to the issue query
-// (epic #10 prototype a28afdf, mod/src/load.js ISSUE: `subIssues(first:50){nodes{id number title url state stateReason projectItems...}}`).
+// (epic #10 prototype a28afdf, mods/project-board/src/load.js ISSUE: `subIssues(first:50){nodes{id number title url state stateReason projectItems...}}`).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseIssue } from "../../mod/src/issue.js";
+import { parseIssue } from "../../mods/project-board/src/issue.js";
 
 const board = "PVT_this";
 const onBoard = (projectId, status) => ({ project: { id: projectId }, status });

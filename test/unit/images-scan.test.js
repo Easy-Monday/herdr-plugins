@@ -1,8 +1,8 @@
-// Developer tests for the #52/#49 scan in mod/src/images.js, beyond the bugs' test lines: it must never
+// Developer tests for the #52/#49 scan in mods/project-board/src/images.js, beyond the bugs' test lines: it must never
 // throw (it runs inside render()), whatever the body holds.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { imageLinks } from "../../mod/src/images.js";
+import { imageLinks } from "../../mods/project-board/src/images.js";
 
 test("an escaped backtick before a backtick run doesn't throw, and text without images stays as written", () => {
   for (const md of ["\\``", "a \\`` b `` c", "\\```\n![a](u)"]) {

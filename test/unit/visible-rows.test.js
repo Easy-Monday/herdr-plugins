@@ -1,11 +1,11 @@
-// Story #7: Done top-level items are hidden unless "Show done" is on (pure part of mod/src/board.js).
+// Story #7: Done top-level items are hidden unless "Show done" is on (pure part of mods/project-board/src/board.js).
 // The tree is built by hand (each node: a board row with `children`), so this doesn't depend on
 // how story #6 builds it from GitHub's answers.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
 // Imported per test, so each T-line reports its own result.
-const board = () => import("../../mod/src/board.js");
+const board = () => import("../../mods/project-board/src/board.js");
 
 const DONE = { name: "Done", color: "PURPLE" };
 const MOVING = { name: "In Progress", color: "YELLOW" };

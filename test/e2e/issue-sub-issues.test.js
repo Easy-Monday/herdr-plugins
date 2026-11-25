@@ -16,7 +16,7 @@ const query = (args) => (args.find((a) => a.startsWith("query=")) ?? "").slice("
 // Like GitHub, the stub answers only the issue fields the issue query names (`subIssues` among them).
 const issueAnswer = (q, node) => ({ data: { node: Object.fromEntries(Object.entries(node).filter(([k]) => k === "id" || new RegExp(`\\b${k}\\b`).test(q))) } });
 
-// The issue query's answer for one issue, in the prototype's shape (a28afdf, mod/src/load.js ISSUE).
+// The issue query's answer for one issue, in the prototype's shape (a28afdf, mods/project-board/src/load.js ISSUE).
 const detail = ({ id, number, title, body, projectId, subIssues = [] }) => ({
   id,
   number,

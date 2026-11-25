@@ -1,7 +1,7 @@
 // Story #2: the repo of the active tab (pure parts).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseRemoteUrl, pickRemote } from "../../mod/src/repo.js";
+import { parseRemoteUrl, pickRemote } from "../../mods/project-board/src/repo.js";
 
 test("T-1: should turn https, ssh and scp-style GitHub remote URLs into owner/repo, and return null for non-GitHub URLs", () => {
   assert.equal(parseRemoteUrl("https://github.com/acme/web.git"), "acme/web");

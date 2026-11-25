@@ -1,5 +1,5 @@
 // Story #14: agent handoff comments get an accent left bar and a Handoff label in the Activity
-// (epic #10 prototype a28afdf: mod/main.js `comment`, mod/ui.js `HandoffTag`; BRD §4.7 prefixes).
+// (epic #10 prototype a28afdf: mods/project-board/main.js `comment`, mods/project-board/ui.js `HandoffTag`; BRD §4.7 prefixes).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";

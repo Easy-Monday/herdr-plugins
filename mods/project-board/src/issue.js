@@ -1,5 +1,5 @@
 // An issue's detail as GitHub's answer gives it, as a plain function: no Herdr, no drawing.
-// Adapted from the approved epic #10 prototype (epic/10-prototype, a28afdf, mod/src/issue.js).
+// Adapted from the approved epic #10 prototype (epic/10-prototype, a28afdf, mods/project-board/src/issue.js).
 // Changed: the header, body (story #11), sub-issues (#12) and activity (#13).
 
 // The issue's Status on this board; null when it isn't on it or has none.

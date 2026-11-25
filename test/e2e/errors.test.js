@@ -1,5 +1,5 @@
 // Story #4: clear messages for gh and git errors, Try again, and the loading indicator.
-// Wording from the approved epic #1 prototype (cac901d, mod/main.js).
+// Wording from the approved epic #1 prototype (cac901d, mods/project-board/main.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";

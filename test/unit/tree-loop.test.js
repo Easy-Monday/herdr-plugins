@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { issue, subIssue, itemsPage } from "../support/items.js";
-import { parseItems, buildTree } from "../../mod/src/board.js";
+import { parseItems, buildTree } from "../../mods/project-board/src/board.js";
 
 const shape = (nodes) => nodes.map((n) => [n.number, shape(n.children)]);
 

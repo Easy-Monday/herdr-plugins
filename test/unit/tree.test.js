@@ -1,4 +1,4 @@
-// Story #6: sub-issues nested under their parent (buildTree in mod/src/board.js).
+// Story #6: sub-issues nested under their parent (buildTree in mods/project-board/src/board.js).
 // Input is parseItems' rows (story #5); each tree node is such a row plus `children`, as in the
 // epic #1 prototype (epic/1-prototype, cac901d). Sub-issues come from the items query's
 // `subIssues` list, which carries no Status and no sub-issue list of its own.
@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { issue, subIssue, itemsPage } from "../support/items.js";
 
 // Imported per test, so each T-line reports its own result.
-const board = () => import("../../mod/src/board.js");
+const board = () => import("../../mods/project-board/src/board.js");
 const rows = async (nodes) => (await board()).parseItems([itemsPage(nodes)]);
 const pick = (node, keys) => Object.fromEntries(keys.map((k) => [k, node[k]]));
 // A tree as numbers only: [number, [children...]].

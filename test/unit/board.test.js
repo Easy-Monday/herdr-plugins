@@ -1,7 +1,7 @@
 // Story #3: the board linked to the repo (pure parts).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pickProject } from "../../mod/src/board.js";
+import { pickProject } from "../../mods/project-board/src/board.js";
 
 const response = (nodes) => ({ data: { repository: { projectsV2: { nodes } } } });
 

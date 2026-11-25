@@ -1,14 +1,14 @@
 // Story #13: an issue's Activity, comments and board Status changes in one list
-// (epic #10 prototype a28afdf, mod/src/activity.js: mergeActivity, relativeTime, statusLine).
+// (epic #10 prototype a28afdf, mods/project-board/src/activity.js: mergeActivity, relativeTime, statusLine).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mergeActivity, relativeTime, statusLine } from "../../mod/src/activity.js";
+import { mergeActivity, relativeTime, statusLine } from "../../mods/project-board/src/activity.js";
 
 // A fixed clock, so relative times don't depend on when the test runs.
 const now = Date.parse("2026-11-23T12:00:00Z");
 const ago = (minutes) => new Date(now - minutes * 60000).toISOString();
 
-// Nodes as the issue query returns them (a28afdf, mod/src/load.js ISSUE): `comments` and
+// Nodes as the issue query returns them (a28afdf, mods/project-board/src/load.js ISSUE): `comments` and
 // `timelineItems(itemTypes:[PROJECT_V2_ITEM_STATUS_CHANGED_EVENT])`.
 const comment = (id, createdAt) => ({ id, author: { login: `agent-${id}` }, createdAt, body: `Body ${id}` });
 const change = (id, createdAt, previousStatus, status) => ({ id, createdAt, previousStatus, status });

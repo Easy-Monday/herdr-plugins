@@ -1,5 +1,5 @@
 // Story #15: an Open image link opens its image URL in the system browser (epic #10 prototype
-// a28afdf: mod/ui.js `Markdown` `on_link_click` → cx.open_url; mod/src/images.js `imageLinks`).
+// a28afdf: mods/project-board/ui.js `Markdown` `on_link_click` → cx.open_url; mods/project-board/src/images.js `imageLinks`).
 // The harness doesn't draw, so the click is the markdown view's link handler with the URL of the
 // link labelled "Open image: …" in that view's markdown.
 import { test } from "node:test";
